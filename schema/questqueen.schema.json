@@ -185,7 +185,10 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["obtain", "item", "item_tag", "submit", "kill", "kill_entity", "raid", "advancement", "location", "visit_structure", "structure", "visit_dimension", "dimension", "visit_biome", "biome", "observation", "checkmark", "stat", "interact_block", "interact_entity", "fluid", "xp_levels", "npc_dialog", "trigger"]
+          "anyOf": [
+            { "enum": ["obtain", "item", "item_tag", "submit", "kill", "kill_entity", "raid", "advancement", "location", "visit_structure", "structure", "visit_dimension", "dimension", "visit_biome", "biome", "observation", "checkmark", "stat", "interact_block", "interact_entity", "fluid", "xp_levels", "npc_dialog", "trigger"] },
+            { "pattern": "^[a-z0-9_.-]+:[a-z0-9_./-]+$", "description": "A task type an addon registers, namespaced with its mod id" }
+          ]
         },
         "item": { "type": "string" },
         "tag": { "type": "string" },
@@ -212,7 +215,13 @@
       "type": "object",
       "required": ["type"],
       "properties": {
-        "type": { "type": "string", "enum": ["item", "xp", "xp_levels", "command", "loot", "toast", "advancement", "choice"] },
+        "type": {
+          "type": "string",
+          "anyOf": [
+            { "enum": ["item", "xp", "xp_levels", "command", "loot", "toast", "advancement", "choice"] },
+            { "pattern": "^[a-z0-9_.-]+:[a-z0-9_./-]+$", "description": "A reward type an addon registers, namespaced with its mod id" }
+          ]
+        },
         "item": { "type": "string" },
         "count": { "type": "integer" },
         "amount": { "type": "integer" },

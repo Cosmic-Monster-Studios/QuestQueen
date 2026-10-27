@@ -85,6 +85,22 @@ public interface Task {
         return task instanceof DisplayedTask displayed ? displayed.task() : task;
     }
 
+    /**
+     * The verb the book shows for this task ({@code LEARN}, {@code CHANNEL}). Quest Queen's own types take theirs
+     * from {@link TaskVerbs}; an addon type without one reads as its humanized name.
+     */
+    default Optional<String> verb() {
+        return Optional.empty();
+    }
+
+    /**
+     * The count text on this task's row while it is open, given the stored value. Empty shows the plain
+     * {@code value/required}.
+     */
+    default Optional<String> progressText(int value) {
+        return Optional.empty();
+    }
+
     default String describe() {
         return type() + itemId().map(id -> " " + id.getPath()).orElse("")
                 + entityId().map(id -> " " + id.getPath()).orElse("")

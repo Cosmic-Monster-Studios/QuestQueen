@@ -6,6 +6,9 @@ import java.util.Optional;
 
 /** Board reward face — every grant type maps to a real item icon. No bare "+" . */
 public final class RewardIcons {
+    /** What an addon reward shows when it names no icon of its own. */
+    static final ResourceLocation ADDON_FALLBACK = ResourceLocation.parse("minecraft:nether_star");
+
     private RewardIcons() {
     }
 
@@ -24,6 +27,9 @@ public final class RewardIcons {
         }
         if (reward instanceof ChoiceReward choice && !choice.options().isEmpty()) {
             return Optional.of(choice.options().getFirst().item());
+        }
+        if (dev.aof.questqueen.data.AddonTypes.namespaced(reward.type())) {
+            return Optional.of(reward.iconItem().orElse(ADDON_FALLBACK));
         }
         return Optional.ofNullable(switch (reward.type()) {
             case "xp", "xp_levels" -> ResourceLocation.parse("minecraft:experience_bottle");

@@ -80,6 +80,10 @@ public final class TaskVerbs {
         if (task == null) {
             return "";
         }
+        Optional<String> own = task.verb().filter(v -> !v.isBlank());
+        if (own.isPresent()) {
+            return own.get();
+        }
         String statFragment = statFragment(task).orElse(null);
         if (statFragment != null) {
             return translated(KEY_PREFIX + "stat." + statFragment, STAT_VERBS.get(statFragment));

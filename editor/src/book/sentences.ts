@@ -67,6 +67,11 @@ export const REWARD_KINDS: Kind[] = [
   { type: "stage", group: "Do", name: "Give a stage", hint: "Unlocks what the stage locks", sentence: "Stage {stage}", fields: [f("stage", "Stage", "stage")] },
 ];
 
+/** A type another mod registers ("mymod:mana"). Quest Queen's own types never have a namespace. */
+export function isAddonType(type: string | undefined): boolean {
+  return typeof type === "string" && type.indexOf(":") > 0;
+}
+
 export function kindOf(type: string): Kind | undefined {
   return TASK_KINDS.find((k) => k.type === type);
 }

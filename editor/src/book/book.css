@@ -229,6 +229,9 @@ button.task-row, button.reward-row { cursor: pointer; }
 .control-line .kind-select option, .control-line .kind-select optgroup { background: #16121c; color: #efe8f6; }
 .control-line .box { width: calc(var(--px, 2) * 60px); }
 .control-line .box.num { width: calc(var(--px, 2) * 22px); }
+/* An addon's task or reward: its fields as JSON. Red edge while the text is not a JSON object. */
+.control-line .addon-json { width: calc(var(--px, 2) * 110px); min-height: calc(var(--px, 2) * 18px); font-family: ui-monospace, monospace; resize: vertical; }
+.control-line .addon-json.bad { border-color: #e01018; }
 .control-line .field { display: inline-flex; align-items: center; gap: calc(var(--px, 2) * 2px); }
 .control-line .field-label { font: calc(var(--px, 2) * 4.5px) / 1 QQBook, system-ui, sans-serif; color: var(--text, #f5f0e0); text-transform: uppercase; }
 .control-line .field-icon { width: calc(var(--px, 2) * 8px); height: calc(var(--px, 2) * 8px); image-rendering: pixelated; }

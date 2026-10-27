@@ -2,6 +2,7 @@ package dev.aof.questqueen;
 
 import com.mojang.logging.LogUtils;
 import dev.aof.questqueen.command.QuestQueenCommands;
+import dev.aof.questqueen.data.AddonTypes;
 import dev.aof.questqueen.data.QuestDefinitions;
 import dev.aof.questqueen.net.QuestNetwork;
 import dev.aof.questqueen.progress.ProgressDatabase;
@@ -12,6 +13,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
 
@@ -23,6 +25,8 @@ public class QuestQueen {
     public QuestQueen(IEventBus modEventBus, ModContainer container) {
         container.registerConfig(ModConfig.Type.COMMON, QuestConfig.SPEC);
         modEventBus.addListener(QuestNetwork::register);
+        // Addon reward and task types are fixed from here on, before any world or datapack loads.
+        modEventBus.addListener((FMLLoadCompleteEvent event) -> AddonTypes.freeze());
         NeoForge.EVENT_BUS.register(QuestDefinitions.class);
         NeoForge.EVENT_BUS.register(ProgressDatabase.class);
         NeoForge.EVENT_BUS.register(ProgressService.class);

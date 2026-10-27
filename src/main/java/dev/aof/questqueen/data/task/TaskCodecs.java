@@ -1,12 +1,16 @@
 package dev.aof.questqueen.data.task;
 
 import com.mojang.serialization.MapCodec;
+import dev.aof.questqueen.data.AddonTypes;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * The task-type → codec registry and the authoring aliases.
+ * The task-type → codec registry and the authoring aliases: Quest Queen's own types, plus the namespaced ones
+ * addons register through {@code QuestQueenApi.registerTask} before loading completes.
  *
  * <p>Deliberately not declared on {@link Task}. Holding these constants in the interface made
  * {@code Task.<clinit>} resolve all nineteen task codecs, while each of those codecs resolves
@@ -14,7 +18,7 @@ import java.util.Map;
  * whole task/reward class graph (every codec failed with {@code Could not initialize class
  * dev.aof.questqueen.data.task.Task}).
  */
-final class TaskCodecs {
+public final class TaskCodecs {
     static final Map<String, String> ALIASES = Map.of(
             "item", "obtain",
             "kill_entity", "kill",
@@ -45,6 +49,9 @@ final class TaskCodecs {
             Map.entry("trigger", TriggerTask.CODEC)
     );
 
+    /** Addon types. Mods set up in parallel, so registration can come from several threads at once. */
+    private static final Map<String, MapCodec<? extends Task>> ADDON = new ConcurrentHashMap<>();
+
     private TaskCodecs() {
     }
 
@@ -53,11 +60,41 @@ final class TaskCodecs {
     static MapCodec<? extends Task> forType(String type) {
         String key = type.toLowerCase(Locale.ROOT);
         String canonical = ALIASES.getOrDefault(key, key);
-        MapCodec<? extends Task> codec = CODECS.get(canonical);
+        MapCodec<? extends Task> builtIn = CODECS.get(canonical);
+        MapCodec<? extends Task> codec = builtIn != null ? builtIn : ADDON.get(canonical);
         if (codec == null) {
             throw new IllegalArgumentException("Unknown quest task type: " + type);
         }
         return WITH_ICON.computeIfAbsent(canonical, ignored -> withIcon(codec));
+    }
+
+    /** Internal: addons call {@code QuestQueenApi.registerTask}. */
+    public static void register(String type, MapCodec<? extends Task> codec) {
+        if (codec == null) {
+            throw new IllegalArgumentException("Quest Queen task type '" + type + "' needs a codec");
+        }
+        String key = AddonTypes.checkedKey("task", type);
+        if (ADDON.putIfAbsent(key, codec) != null) {
+            throw new IllegalStateException("Quest Queen task type '" + type + "' is already registered");
+        }
+    }
+
+    /** True for a type a chapter can use: one of Quest Queen's own (or an alias) or a registered addon type. */
+    public static boolean known(String type) {
+        String key = type == null ? "" : type.toLowerCase(Locale.ROOT);
+        String canonical = ALIASES.getOrDefault(key, key);
+        return CODECS.containsKey(canonical) || ADDON.containsKey(canonical);
+    }
+
+    /** The registered addon types. */
+    public static Set<String> addonTypes() {
+        return Set.copyOf(ADDON.keySet());
+    }
+
+    /** Tests only: forget an addon type so a test can register it again. */
+    static void unregisterForTests(String type) {
+        ADDON.remove(type);
+        WITH_ICON.remove(type);
     }
 
     /**

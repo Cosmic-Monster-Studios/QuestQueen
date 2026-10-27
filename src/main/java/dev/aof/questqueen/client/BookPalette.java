@@ -70,6 +70,16 @@ public record BookPalette(
         );
     }
 
+    /** This palette with {@code accent} as the open-path and current colors (a book mode's accent). */
+    public BookPalette withAccent(int accent) {
+        return new BookPalette(
+                voidColor, cell, cellLine, cellShadow, sidebar, sidebarEdge, sidebarActive, sidebarText, sidebarHeader,
+                locked, lockedText, accent, accent, edit, completed, failed, closed, card, text, muted,
+                portRed, portDim, reward, path, add, modalPink, lockedEdge, gateAnd, gateOr, gateXor, accent, gateNot,
+                claimTint, claimEdge
+        );
+    }
+
     /**
      * A config color as hex ARGB ({@code 33FFD54F}, optional {@code #}); six digits mean opaque. Blank or
      * unreadable gives {@code fallback}.

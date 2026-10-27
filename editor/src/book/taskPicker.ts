@@ -13,7 +13,7 @@ import { attachCombo, itemIcon, textureIcon } from "./combo";
 import { npcEntries, stageEntries, triggerEntries } from "./lists";
 import { h } from "./dom";
 import { namer } from "./names";
-import { REWARD_KINDS, TASK_KINDS, emptyReward, emptyTask, rewardKindOf, kindOf, rewardSentence, taskSentence, type FieldSpec, type Kind, type Picker } from "./sentences";
+import { REWARD_KINDS, TASK_KINDS, emptyReward, emptyTask, isAddonType, rewardKindOf, kindOf, rewardSentence, taskSentence, type FieldSpec, type Kind, type Picker } from "./sentences";
 import type { BookState } from "./store";
 
 const LISTS: Partial<Record<Picker, (s: BookState) => CatalogEntry[]>> = {
@@ -69,9 +69,37 @@ function kindSelect(kinds: Kind[], current: string, grouped: boolean): HTMLSelec
   const children = grouped
     ? (["Gather", "Fight", "Explore", "Do"] as const).map((g) => h("optgroup", { label: g }, ...options(kinds.filter((k) => k.group === g))))
     : options(kinds);
+  // An addon's type keeps its own entry, so the dropdown never quietly shows (and saves) another type.
+  if (isAddonType(current) && !kinds.some((k) => k.type === current)) {
+    children.unshift(h("option", { value: current, selected: true }, `Addon: ${current}`));
+  }
   const select = h("select", { class: "kind-select", "aria-label": "Type" }, ...children) as HTMLSelectElement;
   select.value = current;
   return select;
+}
+
+/**
+ * An addon's task or reward, a namespaced type the book has no form for: its fields as JSON, kept as written. Text
+ * that is not a JSON object is marked and not saved until it is.
+ */
+function addonFields(value: Value, onChange: (value: Value) => void): HTMLElement[] {
+  const { type, ...rest } = value;
+  const area = h("textarea", {
+    class: "box addon-json", rows: 3, spellcheck: "false", "aria-label": `${String(type)} fields as JSON`,
+    title: "Added by another mod. Its fields, as JSON.",
+  }) as HTMLTextAreaElement;
+  area.value = JSON.stringify(rest, null, 1);
+  area.addEventListener("input", () => {
+    try {
+      const parsed: unknown = JSON.parse(area.value.trim() || "{}");
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
+      area.classList.remove("bad");
+      onChange({ ...(parsed as Value), type });
+    } catch {
+      area.classList.add("bad");
+    }
+  });
+  return [h("label", { class: "field" }, h("span", { class: "field-label" }, "Fields (JSON)"), area)];
 }
 
 /** Drop empty optional halves of "a or b" fields, so a mob task with an empty tag field saves without "tag". */
@@ -98,6 +126,13 @@ export function taskLine(task: Task, state: BookState, onChange: (task: Task) =>
       onChange(value as unknown as Task);
       draw();
     });
+    if (!kind && isAddonType(String(value.type))) {
+      line.replaceChildren(select, ...addonFields(value, (next) => {
+        value = next;
+        onChange(value as unknown as Task);
+      }));
+      return;
+    }
     line.replaceChildren(select, ...fieldsOf(kind, value, state, (key, v) => {
       value = tidy(kind, { ...value, [key]: v });
       onChange(value as unknown as Task);
@@ -144,6 +179,11 @@ export function rewardLine(reward: Reward, state: BookState, onChange: (reward: 
         emit();
       })), h("div", { class: "field-label" }, "Players see"), previewEl);
       refresh();
+    } else if (!rewardKindOf(value.type) && isAddonType(value.type)) {
+      parts.push(...addonFields(value as unknown as Value, (next) => {
+        value = next as unknown as Reward;
+        emit();
+      }));
     } else {
       const kind = rewardKindOf(value.type);
       parts.push(...fieldsOf(kind, value as unknown as Value, state, (key, v) => {

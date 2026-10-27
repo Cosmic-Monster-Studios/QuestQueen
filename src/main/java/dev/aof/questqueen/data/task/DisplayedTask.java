@@ -104,4 +104,14 @@ public record DisplayedTask(Task task, String icon) implements Task {
     public String describe() {
         return task.describe();
     }
+
+    @Override
+    public Optional<String> verb() {
+        return task.verb();
+    }
+
+    @Override
+    public Optional<String> progressText(int value) {
+        return task.progressText(value);
+    }
 }

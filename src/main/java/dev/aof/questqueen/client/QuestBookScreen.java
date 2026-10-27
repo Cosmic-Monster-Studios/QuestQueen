@@ -83,7 +83,7 @@ public class QuestBookScreen extends Screen {
     static final int TAB_W = 12;
     static final int TAB_H = 36;
     static final int TOP_H = 26;
-    private static final int FIT_S = 14;
+    static final int FIT_S = 14;
     static final int LOG_W = 48;
     private static int savedSidebarW = SIDEBAR;
     private static boolean savedSidebarCollapsed;
@@ -130,6 +130,8 @@ public class QuestBookScreen extends Screen {
     /** Total init() invocations in this client, logged with each init. */
     static int INIT_COUNT;
     final List<QuestTileWidget> tileWidgets = new ArrayList<>();
+    /** Addon book modes: the toggle, and the mode drawn while one other than quests shows. */
+    final BookModeView modes = new BookModeView(this);
     final QuestOverlayWidget inspectPanel = new QuestOverlayWidget();
     final QuestOverlayWidget modalPanel = new QuestOverlayWidget();
     private static String pendingTileId = "";
@@ -158,6 +160,7 @@ public class QuestBookScreen extends Screen {
     private int lastSyncInspectOffX = Integer.MIN_VALUE;
     private int lastSyncInspectOffY = Integer.MIN_VALUE;
     private ProgressSnapshot lastSyncProgress;
+    private int lastSyncSlide;
     private ResourceLocation lastSyncChapterId;
     private String lastSyncSelected = "";
     private ModalKind lastSyncModal = ModalKind.NONE;
@@ -503,6 +506,9 @@ public class QuestBookScreen extends Screen {
         // (F8 clause 7 - the init count goes above one); re-assert the place after every writer.
         boolean fresh = freshOpen;
         freshOpen = false;
+        if (!fresh) {
+            modes.onReturned();
+        }
         closing = false;
         String keepSelected = selectedId;
         boolean keepExpanded = expanded;
@@ -517,6 +523,10 @@ public class QuestBookScreen extends Screen {
         search.setTextColorUneditable(QuestColors.SIDEBAR_HEADER);
         search.setCanLoseFocus(true);
         search.setResponder(this::onSearch);
+        if (modes.active()) {
+            searchHint = modes.searchHint();
+            search.setHint(searchHint.copy().withColor(QuestColors.SIDEBAR_HEADER & 0x00FFFFFF));
+        }
         addRenderableWidget(search);
         layoutSearch();
         setFocused(null);
@@ -564,6 +574,13 @@ public class QuestBookScreen extends Screen {
         pendingExpanded = expanded;
         Minecraft minecraft = Minecraft.getInstance();
         boolean switched = outcome == ClientQuestState.ChapterSelect.SWITCHED;
+        if (!pendingTileId.isEmpty() || (chapter != null && !chapter.isBlank())) {
+            // Opened on a quest: show quests, whatever mode the book was left on.
+            BookModes.rememberMode(BookModes.QUESTS);
+            if (minecraft.screen instanceof QuestBookScreen open) {
+                open.switchMode(BookModes.QUESTS);
+            }
+        }
         if (minecraft.screen instanceof QuestBookScreen book && !switched) {
             book.applyPendingFocus();
             book.rebuildTileWidgets();
@@ -790,6 +807,7 @@ public class QuestBookScreen extends Screen {
     @Override
     public void removed() {
         closing = true;
+        modes.onRemoved();
         if (chapter != null) {
             ClientQuestState.rememberChapter(chapter.id());
         }
@@ -1219,7 +1237,8 @@ public class QuestBookScreen extends Screen {
                 || modal != lastSyncModal
                 || logOpen != lastSyncLogOpen
                 || expanded != lastSyncExpanded
-                || ClientQuestState.progress != lastSyncProgress;
+                || ClientQuestState.progress != lastSyncProgress
+                || modes.slidePx() != lastSyncSlide;
     }
 
     private void captureWidgetSyncState() {
@@ -1238,6 +1257,7 @@ public class QuestBookScreen extends Screen {
         lastSyncLogOpen = logOpen;
         lastSyncExpanded = expanded;
         lastSyncProgress = ClientQuestState.progress;
+        lastSyncSlide = modes.slidePx();
     }
 
     private void markWidgetsDirty() {
@@ -1407,6 +1427,10 @@ public class QuestBookScreen extends Screen {
     }
 
     private void onSearch(String value) {
+        if (modes.active()) {
+            modes.onSearch(value);
+            return;
+        }
         searchHits.clear();
         searchIndex = 0;
         if (value.isBlank()) {
@@ -1584,6 +1608,10 @@ public class QuestBookScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        if (modes.active()) {
+            modes.render(graphics, mouseX, mouseY, partialTick);
+            return;
+        }
         hoverX = mouseX;
         hoverY = mouseY;
         try {
@@ -1705,6 +1733,7 @@ public class QuestBookScreen extends Screen {
                 pose.popPose();
             }
             drawFadeLock(graphics, partialTick);
+            modes.drawSwitchFade(graphics);
         } catch (Throwable t) {
             QuestQueen.LOGGER.error("Quest book render failed", t);
             graphics.drawString(font, "QUEST BOOK RENDER ERROR - see log", boardLeft() + 8, 40, 0xFFFF5555, true);
@@ -2095,7 +2124,7 @@ public class QuestBookScreen extends Screen {
     /** Right margin of the sidebar rows: clear of the collapse tab, which sits on the sidebar's edge. */
     static final int SIDEBAR_RIGHT_PAD = TAB_W + 2;
 
-    private String ellipsize(String text, int maxPx) {
+    String ellipsize(String text, int maxPx) {
         if (text == null || text.isEmpty() || maxPx < SIDEBAR_LABEL_MIN) {
             return "";
         }
@@ -2240,6 +2269,7 @@ public class QuestBookScreen extends Screen {
         }
         MockChrome.box(graphics, logX(), 6, LOG_W, 14, QuestColors.CARD);
         MockChrome.frame(graphics, logX(), 6, LOG_W, 14, QuestColors.SIDEBAR_EDGE);
+        modes.drawToggle(graphics);
     }
 
     private BookChrome packChrome() {
@@ -2319,7 +2349,7 @@ public class QuestBookScreen extends Screen {
         graphics.drawString(font, text, searchX() - 12 - font.width(text), 9, QuestColors.MUTED, false);
     }
 
-    private void drawSidebarTitle(GuiGraphics graphics) {
+    void drawSidebarTitle(GuiGraphics graphics) {
         BookChrome chrome = resolveChrome();
         float scale = chrome.titleScale();
         int maxW = sidebarTitleMaxW();
@@ -2451,7 +2481,7 @@ public class QuestBookScreen extends Screen {
 
 
     /** 0.6-scale board labels — mock tile text is ~5–7px tall. */
-    private void tinyString(GuiGraphics graphics, String text, int x, int y, int color) {
+    void tinyString(GuiGraphics graphics, String text, int x, int y, int color) {
         var pose = graphics.pose();
         pose.pushPose();
         pose.translate(x, y, 0);
@@ -4448,6 +4478,9 @@ public class QuestBookScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (modes.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
         if (helpOpen && !(keyHelpIconShown() && over(keysX(), 6, KEYS_S, KEYS_S, mouseX, mouseY))) {
             helpOpen = false;
             return true;
@@ -4648,6 +4681,9 @@ public class QuestBookScreen extends Screen {
     public boolean handleQuestKey(int keyCode, int scanCode, int mods) {
         if (typingInSearch()) {
             return false;
+        }
+        if (modes.active()) {
+            return modes.keyPressed(keyCode, scanCode, mods);
         }
         boolean escape = keyCode == GLFW.GLFW_KEY_ESCAPE && (mods & 7) == 0;
         boolean ours = escape || QuestKeybinds.anyBook(keyCode, scanCode, mods);
@@ -5242,6 +5278,10 @@ public class QuestBookScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (modes.active()) {
+            modes.mouseReleased();
+            return super.mouseReleased(mouseX, mouseY, button);
+        }
         if (draggingInspect && ClientQuestState.hasPin()
                 && ClientQuestState.progress.pinChapter().orElse("").equals(chapter.id().toString())) {
             String pinTile = ClientQuestState.progress.pinTile().orElse("");
@@ -5259,6 +5299,9 @@ public class QuestBookScreen extends Screen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (modes.active()) {
+            return modes.mouseDragged(mouseX, mouseY);
+        }
         if (draggingIntroThumb && isIntroChapter()) {
             dragIntroThumb(mouseY);
             return true;
@@ -5294,6 +5337,9 @@ public class QuestBookScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (modes.active()) {
+            return modes.mouseScrolled(mouseX, mouseY, scrollY);
+        }
         if (modal == ModalKind.READER) {
             readerScroll = RichLayout.clampScroll(readerScroll - (int) Math.round(scrollY * 18), readerContentH,
                     readerViewH);
@@ -5342,6 +5388,9 @@ public class QuestBookScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (modes.active()) {
+            return modes.keyPressed(keyCode, scanCode, modifiers) || super.keyPressed(keyCode, scanCode, modifiers);
+        }
         // KeyMappings do not consume clicks while a Screen owns input — handle toggle close here.
         // Not while typing in search: the default key is J, so "jungle" closed the book at the first letter.
         boolean typing = search != null && search.isFocused();
@@ -5870,7 +5919,7 @@ public class QuestBookScreen extends Screen {
         }
     }
 
-    private void bindChapterTheme() {
+    void bindChapterTheme() {
         BookPalette palette = BookPalette.resolveOrDefault(chapter);
         String tint = "";
         String edge = "";
@@ -5880,8 +5929,11 @@ public class QuestBookScreen extends Screen {
         } catch (IllegalStateException notLoaded) {
             // Config not loaded yet: the theme's own claim colors stand.
         }
-        QuestColors.apply(palette.withClaim(BookPalette.parseArgb(tint, palette.claimTint()),
-                BookPalette.parseArgb(edge, palette.claimEdge())));
+        BookPalette applied = palette.withClaim(BookPalette.parseArgb(tint, palette.claimTint()),
+                BookPalette.parseArgb(edge, palette.claimEdge()));
+        QuestColors.apply(applied);
+        BookModes.noteTheme(chapter == null ? BookTheme.MIDNIGHT_ROYALTY.id() : BookTheme.byId(chapter.theme()).id(),
+                applied);
     }
 
     /**
@@ -6164,8 +6216,12 @@ public class QuestBookScreen extends Screen {
     }
 
     int searchW() {
-        int right = keyHelpIconShown() ? keysX() - 8 : isIntroChapter() ? logX() - 8 : fitX() - 8;
-        return Math.max(48, right - searchX());
+        return Math.max(48, searchRight() - searchX() - modes.questReserve());
+    }
+
+    /** Where quest mode's search box would end with no mode toggle beside it. */
+    int searchRight() {
+        return keyHelpIconShown() ? keysX() - 8 : isIntroChapter() ? logX() - 8 : fitX() - 8;
     }
 
     // ---- F6 layout helpers (bundle t_5a9d5cde). WIRED: the draw sites call these; every rule has
@@ -6233,15 +6289,15 @@ public class QuestBookScreen extends Screen {
         return Math.max(28, h / 2 - TAB_H / 2);
     }
 
-    private int tabX() {
+    int tabX() {
         return sidebarCollapsed ? 0 : Math.max(0, sidebarWidth() - TAB_W);
     }
 
-    private int tabY() {
+    int tabY() {
         return Math.max(28, height / 2 - TAB_H / 2);
     }
 
-    private boolean overTab(double mx, double my) {
+    boolean overTab(double mx, double my) {
         return over(tabX(), tabY(), TAB_W, TAB_H, mx, my);
     }
 
@@ -6277,8 +6333,50 @@ public class QuestBookScreen extends Screen {
         }
         search.setX(searchX());
         search.setY(7);
-        search.setWidth(searchW());
+        search.setWidth(modes.active() ? modes.searchW() : searchW());
         search.visible = !logOpen;
+        if (BookModes.any()) {
+            // The hint is drawn unclipped; beside the mode toggle on a narrow book it would run under it.
+            boolean fits = font.width(searchHint.getString()) + 4 <= search.getWidth();
+            search.setHint(fits ? searchHint.copy().withColor(QuestColors.SIDEBAR_HEADER & 0x00FFFFFF) : Component.empty());
+        }
+    }
+
+    /** The search box's hint for the mode showing. */
+    private Component searchHint = Component.literal("Search quests");
+
+    void layoutSearchNow() {
+        layoutSearch();
+    }
+
+    /** Show {@code id} ({@link BookModes#QUESTS} or a registered mode), with the switch animation. */
+    void switchMode(String id) {
+        modes.switchMode(id);
+    }
+
+    /** After a mode switch: the search box takes the new mode's hint, and quest tiles are laid out again. */
+    void onModeSwitched() {
+        if (search != null) {
+            blurSearch();
+            search.setValue("");
+            searchHint = modes.active() ? modes.searchHint() : Component.literal("Search quests");
+            search.setHint(searchHint.copy().withColor(QuestColors.SIDEBAR_HEADER & 0x00FFFFFF));
+        }
+        dragging = false;
+        if (modes.active()) {
+            // The log is quest mode's own page; a mode has none, and its toggle hides while the log is open.
+            logOpen = false;
+            fxLogClosing = false;
+        }
+        layoutSearch();
+        if (!modes.active()) {
+            rebuildTileWidgets();
+            markWidgetsDirty();
+        }
+    }
+
+    boolean superMouseClicked(double mouseX, double mouseY, int button) {
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private void blurSearchIfOutside(double mouseX, double mouseY) {
@@ -6300,7 +6398,7 @@ public class QuestBookScreen extends Screen {
         searchIndex = 0;
     }
 
-    private void drawSidebarTab(GuiGraphics graphics) {
+    void drawSidebarTab(GuiGraphics graphics) {
         int x = tabX();
         int y = tabY();
         MockChrome.box(graphics, x, y, TAB_W, TAB_H, QuestColors.SIDEBAR);
@@ -6325,7 +6423,7 @@ public class QuestBookScreen extends Screen {
 
     int[] screen(int gx, int gy) {
         return new int[]{
-                boardLeft() + gx * stridePx() - camSx(),
+                boardLeft() + gx * stridePx() - camSx() + modes.slidePx(),
                 gy * stridePx() - camSy()
         };
     }

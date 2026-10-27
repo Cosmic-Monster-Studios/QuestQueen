@@ -55,11 +55,13 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 
 public final class TaskHooks {
     private static final int OBSERVATION_INTERVAL = 20;
@@ -146,6 +148,38 @@ public final class TaskHooks {
         if (event.getPlayer() instanceof ServerPlayer player && inventoryScanRuns(player.tickCount, true)) {
             scanInventory(player);
         }
+    }
+
+    /**
+     * Advance every open, unlocked task of {@code type} that {@code match} accepts by {@code amount}, the way the
+     * built-in hooks do for kills and block uses. {@code match} sees the task without its display-item wrapper.
+     * Server thread only.
+     *
+     * @return how many tasks moved
+     */
+    public static int progressMatching(ServerPlayer player, String type, Predicate<Task> match, int amount) {
+        if (amount <= 0) {
+            return 0;
+        }
+        int[] moved = {0};
+        forEachOfTypes(player, List.of(type.toLowerCase(Locale.ROOT)), (chapter, tile, index, task) -> {
+            if (match.test(Task.unwrap(task))) {
+                ProgressService.increment(player, chapter.id(), tile.id(), index, amount);
+                moved[0]++;
+            }
+        });
+        return moved[0];
+    }
+
+    /** Complete every open, unlocked task of {@code type} that {@code match} accepts. Server thread only. */
+    public static int completeMatching(ServerPlayer player, String type, Predicate<Task> match) {
+        int[] done = {0};
+        forEachOfTypes(player, List.of(type.toLowerCase(Locale.ROOT)), (chapter, tile, index, task) -> {
+            if (match.test(Task.unwrap(task)) && ProgressService.setCompleted(player, chapter.id(), tile.id(), index)) {
+                done[0]++;
+            }
+        });
+        return done[0];
     }
 
     @SubscribeEvent

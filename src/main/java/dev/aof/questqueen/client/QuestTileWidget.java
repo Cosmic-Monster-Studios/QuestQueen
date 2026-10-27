@@ -51,6 +51,8 @@ public final class QuestTileWidget extends AbstractWidget {
     private String hoverLock = "";
 
     private String glyph = "";
+    /** A whole texture drawn as the icon (book modes); null for quest tiles. */
+    private net.minecraft.resources.ResourceLocation sprite;
     /** Soft breathing selection halo (alpha only). */
     private boolean selectionHalo;
 
@@ -123,8 +125,12 @@ public final class QuestTileWidget extends AbstractWidget {
         this.glyph = glyph == null ? "" : glyph;
     }
 
+    public void setSprite(net.minecraft.resources.ResourceLocation sprite) {
+        this.sprite = sprite;
+    }
+
     private boolean hasIconFace() {
-        return !icon.isEmpty() || !glyph.isEmpty();
+        return !icon.isEmpty() || !glyph.isEmpty() || sprite != null;
     }
 
     public void setRewardFaces(List<ItemStack> faces, boolean plus) {
@@ -454,6 +460,8 @@ public final class QuestTileWidget extends AbstractWidget {
         int iconY = y + Math.max(8, size >= 56 ? 12 : 10);
         if (!glyph.isEmpty()) {
             QuestGlyphs.draw(graphics, glyph, iconX, iconY, iconSize, locked ? QuestColors.LOCKED_TEXT : QuestColors.TEXT);
+        } else if (sprite != null) {
+            graphics.blit(sprite, iconX, iconY, iconSize, iconSize, 0f, 0f, 16, 16, 16, 16);
         } else if (!icon.isEmpty()) {
             drawScaledItem(graphics, icon, iconX, iconY, iconSize);
         }
@@ -796,7 +804,7 @@ public final class QuestTileWidget extends AbstractWidget {
     /**
      * Half-scale caption: floor snap, pose.scale(0.5), MC chat shadow only. No cardinal outline.
      */
-    private static void tiny(GuiGraphics graphics, Font font, String text, int x, int y, int color) {
+    static void tiny(GuiGraphics graphics, Font font, String text, int x, int y, int color) {
         var pose = graphics.pose();
         pose.pushPose();
         // Integer snap before half-scale so glyphs stay on the pixel grid (Linux/Hyprland).
