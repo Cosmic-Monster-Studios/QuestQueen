@@ -11,6 +11,7 @@ import dev.aof.questqueen.data.HiddenUntil;
 import dev.aof.questqueen.data.QuestDefinitions;
 import dev.aof.questqueen.data.StartNodes;
 import dev.aof.questqueen.data.Tile;
+import dev.aof.questqueen.data.TileNames;
 import dev.aof.questqueen.data.reward.ChoiceReward;
 import dev.aof.questqueen.data.reward.Reward;
 import dev.aof.questqueen.data.reward.StageReward;
@@ -374,7 +375,7 @@ public final class ProgressService {
         writeProgress(teamId, questId, "claimed", 1, true);
         grantTileRewards(player, chapterId, tile.get());
         player.playNotifySound(SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 0.4F, 1.2F);
-        player.sendSystemMessage(Component.translatable("questqueen.rewards_claimed", tile.get().title()));
+        player.sendSystemMessage(Component.translatable("questqueen.rewards_claimed", TileNames.title(tile.get())));
         noteMutation(player, teamId);
         syncTeam(player.server, teamId);
         postClaimed(player, teamId, chapterId, tile.get(), claimedRewards(tile.get(), null),
@@ -825,7 +826,7 @@ public final class ProgressService {
         // Only point the player at the book when there is something there to claim.
         boolean loot = !tile.rewards().isEmpty() || !tile.scrolls().isEmpty();
         player.sendSystemMessage(Component.translatable(loot ? "questqueen.complete" : "questqueen.complete.plain",
-                tile.title()));
+                TileNames.title(tile)));
         // Caller (increment/setCompleted) already schedules syncTeam — one flush covers the tile flag.
         post(new QuestCompletedEvent(player, teamId, TeamService.membersOf(player), chapter.id(), tile.id(),
                 QuestCompletedEvent.Source.PROGRESS));

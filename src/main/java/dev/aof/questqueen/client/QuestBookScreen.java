@@ -1,5 +1,6 @@
 package dev.aof.questqueen.client;
 
+import dev.aof.questqueen.data.TileNames;
 import dev.aof.questqueen.QuestConfig;
 import dev.aof.questqueen.QuestQueen;
 import dev.aof.questqueen.data.BookChrome;
@@ -114,9 +115,9 @@ public class QuestBookScreen extends Screen {
     int searchIndex;
     private static final int SEARCH_HIT_CAP = 12;
     private static final int SEARCH_ROW_H = 14;
-    ModalKind modal = ModalKind.NONE;
     private static final int SEARCH_TEXT_Y = 9;
     private static final int SEARCH_PAD_X = 2;
+    ModalKind modal = ModalKind.NONE;
     String modalTileId = "";
     final List<SidebarRow> sidebarRows = new ArrayList<>();
     private boolean bookScaleApplied;
@@ -844,7 +845,6 @@ public class QuestBookScreen extends Screen {
         window.setGuiScale(scale);
     }
 
-    /** Chunky integer scale: 64px tiles stay readable like the mock (never drop to scale 1 on a 720p+ window). */
     /** The smallest book the layout is drawn for, in GUI pixels. */
     static final int BOOK_MIN_W = 400;
     static final int BOOK_MIN_H = 240;
@@ -871,6 +871,7 @@ public class QuestBookScreen extends Screen {
         return scale;
     }
 
+    /** Chunky integer scale: 64px tiles stay readable like the mock (never drop to scale 1 on a 720p+ window). */
     private static int autoBookScale(int fbW, int fbH) {
         int chosen = 2;
         for (int s = 2; s <= 4; s++) {
@@ -1212,12 +1213,12 @@ public class QuestBookScreen extends Screen {
         if (isIntroChapter()) {
             if (!tileWidgets.isEmpty()) {
                 rebuildTileWidgets();
-            }
             } else if (modal != ModalKind.NONE || modalPanel.visible) {
                 // An act's intro page has no tiles, so nothing below runs. Without this the GOTCHA frame
                 // for a locked chapter clicked from here never followed `modal`: it showed late or not at
                 // all, and after GOTCHA was pressed it stayed up as an empty pink box over a dimmed board.
                 syncOverlays();
+            }
             return;
         }
         if (tileWidgets.size() != chapter.tiles().size()) {
@@ -1484,7 +1485,7 @@ public class QuestBookScreen extends Screen {
                 if (!matchesSearch(tile, needle, open)) {
                     continue;
                 }
-                searchHits.add(new SearchHit(ch.id(), tile.id(), tile.title(), ch.title()));
+                searchHits.add(new SearchHit(ch.id(), tile.id(), TileNames.text(tile), ch.title()));
                 if (searchHits.size() >= SEARCH_HIT_CAP) {
                     return;
                 }
@@ -1493,7 +1494,7 @@ public class QuestBookScreen extends Screen {
     }
 
     static boolean matchesSearch(Tile tile, String needle, boolean descriptionVisible) {
-        return tile.title().toLowerCase(Locale.ROOT).contains(needle)
+        return TileNames.text(tile).toLowerCase(Locale.ROOT).contains(needle)
                 || tile.id().toLowerCase(Locale.ROOT).contains(needle)
                 || (descriptionVisible && RichText.plain(tile.description()).toLowerCase(Locale.ROOT).contains(needle));
     }
@@ -2507,7 +2508,7 @@ public class QuestBookScreen extends Screen {
      * longer swaps itself for "OBTAIN 0/4" — that hid the title and repeated the count right above the footer.
      */
     private String tileObjective(Tile tile) {
-        String title = tile.title().isBlank() ? tile.id() : tile.title();
+        String title = TileNames.text(tile);
         return title.toUpperCase(Locale.ROOT);
     }
 
@@ -3191,7 +3192,7 @@ public class QuestBookScreen extends Screen {
     }
 
     private static String claimAllTileName(Tile tile) {
-        String title = tile.title().isBlank() ? tile.id() : tile.title();
+        String title = TileNames.text(tile);
         return title.toUpperCase(Locale.ROOT);
     }
 
@@ -3416,7 +3417,7 @@ public class QuestBookScreen extends Screen {
         TileVisual visual = tile == null ? TileVisual.CURRENT : ClientQuestState.visual(chapter, tile);
         int edge = borderColor(visual) == 0 ? QuestColors.SIDEBAR_HEADER : borderColor(visual);
         String tag = headerLabel(visual, tile);
-        String title = tile == null ? "" : (tile.title().isBlank() ? tile.id() : tile.title()).toUpperCase(Locale.ROOT);
+        String title = tile == null ? "" : (TileNames.text(tile)).toUpperCase(Locale.ROOT);
         String sub = chapter == null || chapter.title().isBlank() ? "" : chapter.title().toUpperCase(Locale.ROOT);
         return new ModalLayout(x, y, w, h, x + (w - closeW) / 2, y + h - 8 - btnH, closeW, btnH, 0, 0,
                 tabWidth(tag, w - 20), edge, tag, title, sub, "CLOSE", List.of(), y + headerBlock, bodyH);
@@ -3589,7 +3590,7 @@ public class QuestBookScreen extends Screen {
 
     /** The play-mode inspect card contents, drawn inside the card's clip rect. */
     private void drawCardPlay(GuiGraphics graphics, Tile tile, int x, int y, int w, int h, int mouseX, int mouseY) {
-        String title = tile.title().isBlank() ? tile.id().toUpperCase(Locale.ROOT) : tile.title().toUpperCase(Locale.ROOT);
+        String title = TileNames.text(tile).toUpperCase(Locale.ROOT);
         int cursor = drawWrapped(graphics, title, x + 10, y + 14, w - 20, QuestColors.TEXT);
         String body = inspectBody(tile);
         String scrollKey = chapter.id() + "/" + tile.id();
@@ -3856,7 +3857,7 @@ public class QuestBookScreen extends Screen {
             ClientQuestState.Unlock unlock = unlocks.get(i);
             int left = unlocks.size() - i - 1;
             int reserve = left > 0 ? 3 + font.width("+" + left) : 0;
-            String name = unlock.tile().title().isBlank() ? unlock.tile().id() : unlock.tile().title();
+            String name = TileNames.text(unlock.tile());
             String label = ellipsize(name, Math.min(UNLOCK_LABEL_MAX, right - reserve - cx - 15));
             if (label.isEmpty()) {
                 pixel(graphics, Component.literal("+" + (unlocks.size() - i)), cx, rowY + 2, QuestColors.MUTED);
@@ -3902,7 +3903,7 @@ public class QuestBookScreen extends Screen {
             }
             Tile target = hit.unlock().tile();
             List<Component> lines = new ArrayList<>();
-            lines.add(Component.literal(target.title().isBlank() ? target.id() : target.title()));
+            lines.add(Component.literal(TileNames.text(target)));
             if (hit.unlock().open()) {
                 lines.add(Component.literal("Already open").withStyle(ChatFormatting.GRAY));
             } else if (hit.unlock().alsoNeeds().isEmpty()) {
@@ -4448,7 +4449,7 @@ public class QuestBookScreen extends Screen {
             if (!isDone.test(tile)) {
                 continue;
             }
-            String title = tile.title().isBlank() ? tile.id() : tile.title();
+            String title = TileNames.text(tile);
             rows.add(new LogRow(ly,
                     chapterName.toUpperCase(Locale.ROOT) + "  /  " + title.toUpperCase(Locale.ROOT),
                     QuestColors.COMPLETED, Optional.empty(), 8));
@@ -5750,7 +5751,7 @@ public class QuestBookScreen extends Screen {
         if (tile == null) {
             return 96;
         }
-        String title = tile.title().isBlank() ? tile.id() : tile.title();
+        String title = TileNames.text(tile);
         int titleLines = wrapLineCount(title.toUpperCase(Locale.ROOT), cardW() - 20);
         String body = inspectBody(tile);
         int bodyPx = body.isEmpty() ? 0 : richLaid(body, cardW() - 2 * CARD_PAD, CARD_IMAGE_MAX_H).height();

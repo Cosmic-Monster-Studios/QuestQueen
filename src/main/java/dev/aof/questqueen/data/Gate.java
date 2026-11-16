@@ -1,5 +1,6 @@
 package dev.aof.questqueen.data;
 
+import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
@@ -29,9 +30,13 @@ public record Gate(GateOp op, List<GateCondition> conditions) {
             GateCondition.CODEC.listOf().optionalFieldOf("conditions", List.of()).forGetter(Gate::conditions)
     ).apply(instance, Gate::new));
 
-    public static final Codec<Gate> CODEC = Codec.withAlternative(
-            GateOp.CODEC.xmap(op -> new Gate(op, List.of()), Gate::op),
-            OBJECT_CODEC
+    /**
+     * Reads {@code "or"} or {@code {"op": "or", "conditions": [...]}}. Writes the short form only when there are no
+     * conditions: writing it always dropped every condition on the way to the client.
+     */
+    public static final Codec<Gate> CODEC = Codec.either(GateOp.CODEC, OBJECT_CODEC).xmap(
+            either -> either.map(op -> new Gate(op, List.of()), gate -> gate),
+            gate -> gate.conditions().isEmpty() ? Either.left(gate.op()) : Either.right(gate)
     );
 
     public Gate {

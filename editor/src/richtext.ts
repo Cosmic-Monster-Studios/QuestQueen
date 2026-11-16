@@ -253,15 +253,27 @@ function parseSmallInt(raw: string): number | null {
   return /^[+-]?\d{1,9}$/.test(n) ? parseInt(n, 10) : null;
 }
 
+/** True when the character at `at` is escaped: an odd run of backslashes sits right before it. */
+function escaped(s: string, at: number): boolean {
+  let n = 0;
+  for (let i = at - 1; i >= 0 && s[i] === "\\"; i--) n++;
+  return n % 2 === 1;
+}
+
+/** Next unescaped `token`, so "*\**" closes on the last star rather than the escaped one. */
 function indexOf(s: string, token: string, from: number, end: number): number {
-  const at = s.indexOf(token, from);
+  let at = s.indexOf(token, from);
+  while (at >= 0 && escaped(s, at)) at = s.indexOf(token, at + 1);
   return at >= 0 && at + token.length <= end ? at : -1;
 }
 
-/** Next lone * that follows a non-space, so "5 * 3 * 2" is not italic. */
+/** Next lone, unescaped * that follows a non-space, so "5 * 3 * 2" is not italic. */
 function singleStar(s: string, from: number, end: number): number {
   for (let i = from; i < end; i++) {
-    if (s[i] === "*" && !s.startsWith("**", i) && s[i - 1] !== "*" && !/\s/.test(s[i - 1])) return i;
+    if (s[i] !== "*" || escaped(s, i) || /\s/.test(s[i - 1])) continue;
+    if (s.startsWith("**", i)) continue;
+    if (s[i - 1] === "*" && !escaped(s, i - 1)) continue;
+    return i;
   }
   return -1;
 }

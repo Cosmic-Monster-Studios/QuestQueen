@@ -2,6 +2,7 @@ package dev.aof.questqueen.data;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -18,16 +19,21 @@ public final class GateEvaluator {
             return false;
         }
         List<Link> inbound = chapter.links().stream().filter(link -> link.to().equals(tileId)).toList();
-        if (inbound.isEmpty()) {
+        Optional<Gate> requires = chapter.tile(tileId).flatMap(Tile::requires)
+                .filter(gate -> !gate.conditions().isEmpty());
+        if (inbound.isEmpty() && requires.isEmpty()) {
             return extrasPass(List.of(), extras);
         }
         List<Boolean> incoming = new ArrayList<>();
         List<GateCondition> conditions = new ArrayList<>();
-        GateOp op = joinOp(inbound);
+        GateOp op = inbound.isEmpty() ? requires.get().op() : joinOp(inbound);
         for (Link link : inbound) {
             incoming.add(completedTiles.contains(link.from()));
             conditions.addAll(link.gate().conditions());
         }
+        // Parents the board does not draw (too far away, or in another chapter) join the drawn ones under the
+        // same op, so a quest needing five others waits for all five whether or not they sit next to it.
+        requires.ifPresent(gate -> gate.conditions().forEach(condition -> incoming.add(extras.test(condition))));
         return evaluate(op, incoming) && extrasPass(conditions, extras);
     }
 

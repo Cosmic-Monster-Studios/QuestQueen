@@ -1,5 +1,6 @@
 package dev.aof.questqueen.client;
 
+import dev.aof.questqueen.data.TileNames;
 import dev.aof.questqueen.QuestConfig;
 import dev.aof.questqueen.data.Chapter;
 import dev.aof.questqueen.data.Tile;
@@ -93,7 +94,7 @@ public final class QuestHudOverlay {
         if (tile.isEmpty()) {
             return;
         }
-        String title = tile.get().title().isBlank() ? tile.get().id() : tile.get().title();
+        String title = TileNames.text(tile.get());
         String task = ClientQuestState.taskProgressLabel(chapter.get(), tile.get());
         boolean done = ClientQuestState.progress.tileCompleted(chapter.get().id().toString(), tile.get().id());
         boolean claimed = ClientQuestState.rewardsClaimed(chapter.get(), tile.get());

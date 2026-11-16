@@ -146,6 +146,24 @@
             "type": { "type": "string", "enum": ["trigger", "quest_complete", "advancement", "team_flag", "scoreboard"] },
             "id": { "type": "string" }
           }
+        },
+        "requires": {
+          "type": "object",
+          "description": "Parents the board does not draw as links: quests too far away to sit next to this one, or in another chapter. They count under the same op as the quest's links (with no links, under this op). quest_complete ids are chapter/quest, e.g. mypack:mining/first_pick.",
+          "properties": {
+            "op": { "type": "string", "enum": ["and", "or", "not", "xor"] },
+            "conditions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["type", "id"],
+                "properties": {
+                  "type": { "type": "string", "enum": ["advancement", "scoreboard", "team_flag", "quest_complete", "chapter_complete", "trigger", "stage"] },
+                  "id": { "type": "string" }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -228,6 +246,7 @@
         "levels": { "type": "integer" },
         "command": { "type": "string" },
         "table": { "type": "string" },
+        "name": { "type": "string", "description": "loot: what the book calls the roll, e.g. \"Mekanism T1\"; without it, the table's path" },
         "message": { "type": "string" },
         "advancement": { "type": "string" },
         "options": {

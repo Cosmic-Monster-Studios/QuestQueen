@@ -1,5 +1,6 @@
 package dev.aof.questqueen.client;
 
+import dev.aof.questqueen.data.TileNames;
 import dev.aof.questqueen.data.Chapter;
 import dev.aof.questqueen.data.ChapterTree;
 import dev.aof.questqueen.data.GateCondition;
@@ -473,7 +474,7 @@ public final class ClientQuestState {
 
     public static String taskVerb(Tile tile) {
         if (tile.tasks().isEmpty()) {
-            return tile.title().isBlank() ? tile.id() : tile.title();
+            return TileNames.text(tile);
         }
         return taskVerb(tile.tasks().getFirst(), tile);
     }
@@ -488,7 +489,7 @@ public final class ClientQuestState {
      */
     public static String taskVerb(Task task, Tile tile) {
         if (task == null) {
-            return tile.title().isBlank() ? tile.id() : tile.title();
+            return TileNames.text(tile);
         }
         return TaskVerbs.verb(task);
     }

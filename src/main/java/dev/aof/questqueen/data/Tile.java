@@ -20,7 +20,8 @@ public record Tile(
         List<ResourceLocation> scrolls,
         Optional<JumpTarget> target,
         Optional<HiddenUntil> hiddenUntil,
-        Optional<String> requiredStage
+        Optional<String> requiredStage,
+        Optional<Gate> requires
 ) {
     public static final Codec<Tile> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("id").forGetter(Tile::id),
@@ -33,33 +34,43 @@ public record Tile(
             ResourceLocation.CODEC.listOf().optionalFieldOf("scrolls", List.of()).forGetter(Tile::scrolls),
             JumpTarget.CODEC.optionalFieldOf("target").forGetter(Tile::target),
             HiddenUntil.CODEC.optionalFieldOf("hidden_until").forGetter(Tile::hiddenUntil),
-            Codec.STRING.optionalFieldOf("required_stage").forGetter(Tile::requiredStage)
+            Codec.STRING.optionalFieldOf("required_stage").forGetter(Tile::requiredStage),
+            Gate.CODEC.optionalFieldOf("requires").forGetter(Tile::requires)
     ).apply(instance, Tile::new));
 
     public Tile {
         tasks = List.copyOf(tasks);
         rewards = List.copyOf(rewards);
         scrolls = List.copyOf(scrolls);
+        requires = requires == null ? Optional.empty() : requires;
+    }
+
+    /** A tile with no {@code requires}: every parent it has is drawn as a link. */
+    public Tile(String id, GridPos pos, String title, String description, Optional<Icon> icon, List<Task> tasks,
+                List<Reward> rewards, List<ResourceLocation> scrolls, Optional<JumpTarget> target,
+                Optional<HiddenUntil> hiddenUntil, Optional<String> requiredStage) {
+        this(id, pos, title, description, icon, tasks, rewards, scrolls, target, hiddenUntil, requiredStage,
+                Optional.empty());
     }
 
     public Tile withPos(GridPos newPos) {
-        return new Tile(id, newPos, title, description, icon, tasks, rewards, scrolls, target, hiddenUntil, requiredStage);
+        return new Tile(id, newPos, title, description, icon, tasks, rewards, scrolls, target, hiddenUntil, requiredStage, requires);
     }
 
     public Tile withTitle(String newTitle) {
-        return new Tile(id, pos, newTitle, description, icon, tasks, rewards, scrolls, target, hiddenUntil, requiredStage);
+        return new Tile(id, pos, newTitle, description, icon, tasks, rewards, scrolls, target, hiddenUntil, requiredStage, requires);
     }
 
     public Tile withDescription(String newDescription) {
-        return new Tile(id, pos, title, newDescription, icon, tasks, rewards, scrolls, target, hiddenUntil, requiredStage);
+        return new Tile(id, pos, title, newDescription, icon, tasks, rewards, scrolls, target, hiddenUntil, requiredStage, requires);
     }
 
     public Tile withTasks(List<Task> newTasks) {
-        return new Tile(id, pos, title, description, icon, newTasks, rewards, scrolls, target, hiddenUntil, requiredStage);
+        return new Tile(id, pos, title, description, icon, newTasks, rewards, scrolls, target, hiddenUntil, requiredStage, requires);
     }
 
     public Tile withRewards(List<Reward> newRewards) {
-        return new Tile(id, pos, title, description, icon, tasks, newRewards, scrolls, target, hiddenUntil, requiredStage);
+        return new Tile(id, pos, title, description, icon, tasks, newRewards, scrolls, target, hiddenUntil, requiredStage, requires);
     }
 
     public static Tile blank(String id, int x, int y) {
