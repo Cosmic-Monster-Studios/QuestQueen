@@ -67,6 +67,16 @@ public final class ProgressService {
             TeamService.current(player);
             invalidatePlayer(player.getUUID());
             syncNow(player);
+            catchUpTeamStages(player);
+        }
+    }
+
+    /** Shared stage rewards the player's team claimed while they were away or before they joined. */
+    private static void catchUpTeamStages(ServerPlayer player) {
+        try {
+            TeamStages.catchUp(player);
+        } catch (RuntimeException exception) {
+            QuestQueen.LOGGER.warn("Team stage catch-up failed for {}", player.getGameProfile().getName(), exception);
         }
     }
 
@@ -124,6 +134,8 @@ public final class ProgressService {
         ProgressSnapshot cached = SNAPSHOT_CACHE.get(player.getUUID());
         if (cached != null && !cached.teamId().equals(TeamService.current(player))) {
             syncNow(player);
+            // A new team: its shared stage rewards are now this player's too. Leaving revokes nothing.
+            catchUpTeamStages(player);
         }
     }
 
