@@ -115,6 +115,8 @@ public class QuestBookScreen extends Screen {
     private static final int SEARCH_HIT_CAP = 12;
     private static final int SEARCH_ROW_H = 14;
     ModalKind modal = ModalKind.NONE;
+    private static final int SEARCH_TEXT_Y = 9;
+    private static final int SEARCH_PAD_X = 2;
     String modalTileId = "";
     final List<SidebarRow> sidebarRows = new ArrayList<>();
     private boolean bookScaleApplied;
@@ -515,7 +517,7 @@ public class QuestBookScreen extends Screen {
         INIT_COUNT++;
         QuestQueen.LOGGER.info("[questqueen] book init #{} fresh={}", INIT_COUNT, fresh);
         applyBookGuiScale();
-        search = new EditBox(font, searchX(), 7, searchW(), 12, Component.literal("Search"));
+        search = new EditBox(font, searchX() + SEARCH_PAD_X, SEARCH_TEXT_Y, searchW() - SEARCH_PAD_X, 10, Component.literal("Search"));
         // EditBox draws the hint in the text color, so an unstyled hint looked like typed text.
         search.setHint(Component.literal("Search quests").withColor(QuestColors.SIDEBAR_HEADER & 0x00FFFFFF));
         search.setBordered(false);
@@ -827,7 +829,8 @@ public class QuestBookScreen extends Screen {
             return;
         }
         Window window = minecraft.getWindow();
-        int want = pickBookScale(window);
+        int playerScale = window.calculateScale(minecraft.options.guiScale().get(), minecraft.isEnforceUnicode());
+        int want = pickBookScale(window.getWidth(), window.getHeight(), QuestConfig.BOOK_SCALE.get(), playerScale);
         window.setGuiScale(want);
         this.width = window.getGuiScaledWidth();
         this.height = window.getGuiScaledHeight();
@@ -842,16 +845,40 @@ public class QuestBookScreen extends Screen {
     }
 
     /** Chunky integer scale: 64px tiles stay readable like the mock (never drop to scale 1 on a 720p+ window). */
-    private static int pickBookScale(Window window) {
-        int fbW = window.getWidth();
-        int fbH = window.getHeight();
+    /** The smallest book the layout is drawn for, in GUI pixels. */
+    static final int BOOK_MIN_W = 400;
+    static final int BOOK_MIN_H = 240;
+
+    /**
+     * The scale the book opens at. {@code mode} is the config's {@code book.scale}: "auto" picks from the
+     * window, "game" takes the player's own GUI scale, "1".."4" is that scale. Anything but auto is lowered
+     * until the book keeps {@link #BOOK_MIN_W} x {@link #BOOK_MIN_H} GUI pixels, so it cannot be set off-screen.
+     */
+    static int pickBookScale(int fbW, int fbH, String mode, int playerScale) {
+        String m = mode == null ? "" : mode.trim().toLowerCase(java.util.Locale.ROOT);
+        int asked;
+        if ("game".equals(m)) {
+            asked = playerScale;
+        } else if (m.length() == 1 && m.charAt(0) >= '1' && m.charAt(0) <= '4') {
+            asked = m.charAt(0) - '0';
+        } else {
+            return autoBookScale(fbW, fbH);
+        }
+        int scale = Math.max(1, asked);
+        while (scale > 1 && (fbW / scale < BOOK_MIN_W || fbH / scale < BOOK_MIN_H)) {
+            scale--;
+        }
+        return scale;
+    }
+
+    private static int autoBookScale(int fbW, int fbH) {
         int chosen = 2;
         for (int s = 2; s <= 4; s++) {
             if (fbW / s >= 480 && fbH / s >= 280) {
                 chosen = s;
             }
         }
-        if (fbW / chosen < 400 || fbH / chosen < 240) {
+        if (fbW / chosen < BOOK_MIN_W || fbH / chosen < BOOK_MIN_H) {
             chosen = Math.max(1, chosen - 1);
         }
         return chosen;
@@ -1186,6 +1213,11 @@ public class QuestBookScreen extends Screen {
             if (!tileWidgets.isEmpty()) {
                 rebuildTileWidgets();
             }
+            } else if (modal != ModalKind.NONE || modalPanel.visible) {
+                // An act's intro page has no tiles, so nothing below runs. Without this the GOTCHA frame
+                // for a locked chapter clicked from here never followed `modal`: it showed late or not at
+                // all, and after GOTCHA was pressed it stayed up as an empty pink box over a dimmed board.
+                syncOverlays();
             return;
         }
         if (tileWidgets.size() != chapter.tiles().size()) {
@@ -6331,9 +6363,11 @@ public class QuestBookScreen extends Screen {
         if (search == null) {
             return;
         }
-        search.setX(searchX());
-        search.setY(7);
-        search.setWidth(modes.active() ? modes.searchW() : searchW());
+        // Unbordered, the EditBox draws its text at its own top-left corner: inset it so the line sits
+        // centered in the 14 px frame (y 6..20) and clear of the left edge.
+        search.setX(searchX() + SEARCH_PAD_X);
+        search.setY(SEARCH_TEXT_Y);
+        search.setWidth((modes.active() ? modes.searchW() : searchW()) - SEARCH_PAD_X);
         search.visible = !logOpen;
         if (BookModes.any()) {
             // The hint is drawn unclipped; beside the mode toggle on a narrow book it would run under it.
