@@ -12,10 +12,12 @@ import net.neoforged.neoforge.common.NeoForge;
 import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Optional bridge to StageLock (mod id {@code stagelock}), the stage mod. Reflection rather than a compile
@@ -37,6 +39,7 @@ public final class StageLockCompat {
     private static Method getStages;
     private static Method asSet;
     private static Method grant;
+    private static Method grantByUuid;
 
     private StageLockCompat() {
     }
@@ -110,6 +113,27 @@ public final class StageLockCompat {
             return true;
         } catch (Throwable exception) {
             QuestQueen.LOGGER.warn("StageLock grant failed for {}: {}", id, exception.toString());
+            return false;
+        }
+    }
+
+    /**
+     * Player-scope grant by UUID, online or offline (StageLock keeps offline players' stages in its own store).
+     * False when StageLock is unavailable, threw, or added nothing because a listener canceled the grant; also
+     * false when the player already had it at player scope, which callers treat the same as success.
+     */
+    public static boolean grantStage(UUID player, String id) {
+        if (player == null || normalize(id).isEmpty() || !ready()) {
+            return false;
+        }
+        try {
+            if (grantByUuid == null) {
+                grantByUuid = Class.forName(API).getMethod("grant", UUID.class, java.util.Collection.class);
+            }
+            Object added = grantByUuid.invoke(null, player, List.of(normalize(id)));
+            return added instanceof Set<?> set && !set.isEmpty();
+        } catch (Throwable exception) {
+            QuestQueen.LOGGER.warn("StageLock grant failed for {} ({}): {}", id, player, exception.toString());
             return false;
         }
     }

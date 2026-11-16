@@ -84,6 +84,18 @@ public final class Stages {
         };
     }
 
+    /**
+     * Grant to a player who may be offline. StageLock stores it either way; the other backends need the player
+     * online, so an offline grant there answers false and waits for {@code TeamStages.catchUp} at their next login.
+     */
+    public static boolean grantStage(net.minecraft.server.MinecraftServer server, java.util.UUID player, String id) {
+        ServerPlayer online = server == null ? null : server.getPlayerList().getPlayer(player);
+        if (online != null) {
+            return grantStage(online, id);
+        }
+        return backend() == Backend.STAGELOCK && StageLockCompat.grantStage(player, id);
+    }
+
     /** The player's stages, sent to the client so the book can decide stage-gated quests the way the server does. */
     public static Set<String> ownedStages(ServerPlayer player) {
         return switch (backend()) {

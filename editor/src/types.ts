@@ -39,6 +39,8 @@ export interface Reward {
   message?: string;
   advancement?: string;
   stage?: string;
+  /** Stage rewards only: false keeps the stage for the claimer; absent or true gives it to the whole team. */
+  shared?: boolean;
   options?: Reward[];
 }
 export interface JumpTarget { chapter: string; tile: string; }
