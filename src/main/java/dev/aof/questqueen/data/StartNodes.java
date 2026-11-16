@@ -17,7 +17,9 @@ public final class StartNodes {
         Set<String> inbound = links.stream().map(Link::to).collect(Collectors.toSet());
         Set<String> starts = new HashSet<>();
         for (Tile tile : tiles) {
-            if (!inbound.contains(tile.id())) {
+            // A tile whose only parents are undrawn (requires) has no arrow in, but it is not a start.
+            boolean required = tile.requires().map(gate -> !gate.conditions().isEmpty()).orElse(false);
+            if (!inbound.contains(tile.id()) && !required) {
                 starts.add(tile.id());
             }
         }

@@ -9,7 +9,7 @@ export type Group = "Gather" | "Fight" | "Explore" | "Do";
 /** What a field holds, and so which picker edits it. */
 export type Picker =
   | "item" | "tag" | "entity" | "entityTag" | "block" | "biome" | "structure" | "dimension" | "fluid"
-  | "advancement" | "loot" | "stage" | "number" | "text";
+  | "advancement" | "loot" | "stage" | "stat" | "npc" | "trigger" | "icon" | "number" | "text";
 
 export interface FieldSpec {
   key: string;
@@ -50,9 +50,9 @@ export const TASK_KINDS: Kind[] = [
   { type: "interact_block", group: "Do", name: "Use a block", hint: "Right-click it", sentence: "Use {block} {count} times", fields: [f("block", "Block", "block"), COUNT] },
   { type: "interact_entity", group: "Do", name: "Use on a mob", hint: "Right-click it", sentence: "Use on {entity} {count} times", fields: [f("entity", "Mob", "entity"), COUNT] },
   { type: "xp_levels", group: "Do", name: "Spend XP levels", hint: "Taken when handed in", sentence: "Spend {levels} XP levels", fields: [f("levels", "Levels", "number")] },
-  { type: "stat", group: "Do", name: "Reach a statistic", hint: "Blocks walked, jumps…", sentence: "Reach {count} {stat}", fields: [COUNT, f("stat", "Statistic", "text")] },
-  { type: "npc_dialog", group: "Do", name: "Talk to someone", hint: "An NPC by name", sentence: "Talk to {npc}", fields: [f("npc", "NPC", "text")] },
-  { type: "trigger", group: "Do", name: "Script trigger", hint: "Fired by a command or script", sentence: "Wait for {trigger}", fields: [f("trigger", "Trigger id", "text")] },
+  { type: "stat", group: "Do", name: "Reach a statistic", hint: "Blocks walked, jumps…", sentence: "Reach {count} {stat}", fields: [COUNT, f("stat", "Statistic", "stat")] },
+  { type: "npc_dialog", group: "Do", name: "Talk to someone", hint: "An NPC by name", sentence: "Talk to {npc}", fields: [f("npc", "NPC", "npc")] },
+  { type: "trigger", group: "Do", name: "Script trigger", hint: "Fired by a command or script", sentence: "Wait for {trigger}", fields: [f("trigger", "Trigger id", "trigger")] },
 ];
 
 export const REWARD_KINDS: Kind[] = [
@@ -66,6 +66,11 @@ export const REWARD_KINDS: Kind[] = [
   { type: "choice", group: "Do", name: "Player chooses", hint: "One item of several", sentence: "", fields: [] },
   { type: "stage", group: "Do", name: "Give a stage", hint: "Unlocks what the stage locks", sentence: "Stage {stage}", fields: [f("stage", "Stage", "stage")] },
 ];
+
+/** A type another mod registers ("mymod:mana"). Quest Queen's own types never have a namespace. */
+export function isAddonType(type: string | undefined): boolean {
+  return typeof type === "string" && type.indexOf(":") > 0;
+}
 
 export function kindOf(type: string): Kind | undefined {
   return TASK_KINDS.find((k) => k.type === type);

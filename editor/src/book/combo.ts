@@ -1,13 +1,15 @@
 // A dropdown for any box that holds a pack id (item, mob, block, structure, biome, stage…): focusing the box opens
 // a list of everything the pack has, typing narrows it, and choosing a row fills the box. An id the pack doesn't
 // list can still be typed and kept. The box stays a plain <input>, so the page hears the same `input` events as
-// before whether the id was typed or chosen.
+// before whether the id was typed or chosen. A box holding several ids ("a, b") searches and fills the last one.
 import { bridgeBase } from "../bridge";
 import { iconUrl } from "../itemSelect";
 import type { CatalogEntry } from "../packCatalog";
 import { h } from "./dom";
 
 const PAGE = 120;
+/** The book colors the panel's CSS uses. */
+const THEME = ["--edit", "--ui", "--muted", "--sidebar-edge"];
 
 /** 3: id or name starts with the text · 2: a word in it does · 1: it appears inside. Order within a rank is kept. */
 function rank(entry: CatalogEntry, q: string): number {
@@ -33,9 +35,15 @@ export function filterEntries(entries: CatalogEntry[], text: string): CatalogEnt
 }
 
 export interface ComboOptions {
-  /** Show each entry's item picture. */
-  icons: boolean;
+  /** Each row's picture, by id (none when it gives nothing). */
+  icon?: (id: string) => string | undefined;
+  /** The box holds a comma-separated list: the list searches and fills the last entry. */
+  multi?: boolean;
 }
+
+/** Row pictures: the game's render of an item, or a texture itself. */
+export const itemIcon = (id: string) => iconUrl(bridgeBase(), id);
+export const textureIcon = (id: string) => `${bridgeBase()}/api/texture?id=${encodeURIComponent(id)}`;
 
 export interface Combo {
   close(): void;
@@ -49,13 +57,15 @@ export function attachCombo(input: HTMLInputElement, entries: () => CatalogEntry
   let list: HTMLElement;
   let note: HTMLElement;
 
-  const exact = () => entries().some((e) => e.id === input.value.trim());
+  // What the list is about: the whole box, or the entry after the last comma.
+  const term = () => (options.multi ? input.value.slice(input.value.lastIndexOf(",") + 1) : input.value).trim();
+  const exact = () => entries().some((e) => e.id === term());
   // A box that already holds a real id shows everything (to pick another); otherwise the text is the search.
   const compute = () => {
     const all = entries();
-    shown = exact() ? all : filterEntries(all, input.value);
-    const chosen = shown.findIndex((e) => e.id === input.value.trim());
-    at = chosen >= 0 ? chosen : shown.length && input.value.trim() ? 0 : -1;
+    shown = exact() ? all : filterEntries(all, term());
+    const chosen = shown.findIndex((e) => e.id === term());
+    at = chosen >= 0 ? chosen : shown.length && term() ? 0 : -1;
     if (chosen >= count) count = chosen + PAGE;
   };
 
@@ -74,10 +84,11 @@ export function attachCombo(input: HTMLInputElement, entries: () => CatalogEntry
 
   const row = (entry: CatalogEntry, i: number) => {
     const named = entry.name && entry.name !== entry.id;
+    const picture = options.icon?.(entry.id);
     return h("div", {
-      class: `combo-row${i === at ? " active" : ""}${entry.id === input.value.trim() ? " chosen" : ""}`, role: "option", dataset: { id: entry.id },
+      class: `combo-row${i === at ? " active" : ""}${entry.id === term() ? " chosen" : ""}`, role: "option", dataset: { id: entry.id },
       onmousedown: (event: Event) => { event.preventDefault(); choose(entry.id); },
-    }, options.icons ? h("img", { class: "combo-icon icon", alt: "", loading: "lazy", src: iconUrl(bridgeBase(), entry.id) }) : null,
+    }, picture ? h("img", { class: "combo-icon icon", alt: "", loading: "lazy", src: picture }) : null,
     h("span", { class: "combo-name" }, named ? entry.name! : entry.id), named ? h("span", { class: "combo-id" }, entry.id) : null);
   };
 
@@ -85,7 +96,7 @@ export function attachCombo(input: HTMLInputElement, entries: () => CatalogEntry
     if (!panel) return;
     list.replaceChildren(...shown.slice(0, count).map(row));
     const total = entries().length;
-    const text = input.value.trim();
+    const text = term();
     note.textContent = shown.length
       ? `${shown.length === total ? total : `${shown.length} of ${total}`} in this pack`
       : text ? `Not in this pack. Enter keeps “${text}” as typed.` : "Nothing in the pack to list.";
@@ -94,7 +105,8 @@ export function attachCombo(input: HTMLInputElement, entries: () => CatalogEntry
   };
 
   const choose = (id: string) => {
-    input.value = id;
+    const comma = options.multi ? input.value.lastIndexOf(",") : -1;
+    input.value = comma >= 0 ? `${input.value.slice(0, comma + 1)} ${id}` : id;
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
     close();
@@ -113,8 +125,14 @@ export function attachCombo(input: HTMLInputElement, entries: () => CatalogEntry
     });
     count = PAGE;
     compute();
-    // Inside the book root so it wears the chapter's colours; the page body in a bare test.
-    (input.closest(".qq-book-app") ?? document.body).append(panel);
+    // On the page body, above every popover and dialog (the icon and task pickers live there too, over the book),
+    // wearing the chapter's colors copied from the book root.
+    const root = document.querySelector(".qq-book-app");
+    if (root) {
+      const theme = getComputedStyle(root);
+      for (const name of THEME) panel.style.setProperty(name, theme.getPropertyValue(name));
+    }
+    document.body.append(panel);
     place();
     paint();
   }
@@ -144,7 +162,7 @@ export function attachCombo(input: HTMLInputElement, entries: () => CatalogEntry
       if (at >= count) count = at + PAGE;
       paint();
     } else if (event.key === "Enter" && panel) {
-      if (at >= 0 && shown[at] && !(exact() && shown[at].id !== input.value.trim())) {
+      if (at >= 0 && shown[at] && !(exact() && shown[at].id !== term())) {
         event.preventDefault();
         choose(shown[at].id);
       } else close();

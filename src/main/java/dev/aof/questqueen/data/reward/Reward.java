@@ -29,7 +29,19 @@ public interface Reward {
         return 1;
     }
 
+    /**
+     * The item the book shows for a reward type Quest Queen does not draw itself. Addon rewards override this;
+     * without it an addon reward shows a nether star.
+     */
+    default Optional<ResourceLocation> iconItem() {
+        return Optional.empty();
+    }
+
+    /** One line naming the reward. An addon type without its own reads as its humanized name. */
     default String describe() {
+        if (dev.aof.questqueen.data.AddonTypes.namespaced(type())) {
+            return dev.aof.questqueen.data.task.TaskVerbs.humanize(type());
+        }
         return type().toUpperCase(Locale.ROOT);
     }
 

@@ -1,5 +1,6 @@
 package dev.aof.questqueen.data.reward;
 
+import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.registries.Registries;
@@ -13,10 +14,18 @@ import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 
-public record LootTableReward(ResourceLocation table) implements Reward {
+import java.util.Optional;
+
+/** {@code name} is what the book calls the roll ("Mekanism T1"); without one it shows the table's path. */
+public record LootTableReward(ResourceLocation table, Optional<String> name) implements Reward {
     public static final MapCodec<LootTableReward> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
-            ResourceLocation.CODEC.fieldOf("table").forGetter(LootTableReward::table)
+            ResourceLocation.CODEC.fieldOf("table").forGetter(LootTableReward::table),
+            Codec.STRING.optionalFieldOf("name").forGetter(LootTableReward::name)
     ).apply(instance, LootTableReward::new));
+
+    public LootTableReward(ResourceLocation table) {
+        this(table, Optional.empty());
+    }
 
     @Override
     public String type() {
@@ -25,7 +34,7 @@ public record LootTableReward(ResourceLocation table) implements Reward {
 
     @Override
     public String describe() {
-        return "loot " + table.getPath();
+        return name.filter(n -> !n.isBlank()).orElse("loot " + table.getPath());
     }
 
     @Override

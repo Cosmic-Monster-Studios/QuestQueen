@@ -14,7 +14,7 @@ import java.util.Locale;
  * <pre>
  * # Heading            ## Smaller heading
  * **bold**  *italic*  __underline__
- * {#RRGGBB}coloured{/#}      {size:12}bigger{/size}
+ * {#RRGGBB}colored{/#}      {size:12}bigger{/size}
  * - a bullet                  ---   (a rule)
  * {item:minecraft:diamond}    {item:minecraft:iron_ingot x3}    {glyph:sword}
  * ![caption](mypack:textures/quest/castle.png)      (a picture, alone on its line)
@@ -40,7 +40,7 @@ public final class RichText {
     public sealed interface Inline permits Text, Item, Glyph {
     }
 
-    /** {@code color} 0 means "the caller's default colour". */
+    /** {@code color} 0 means "the caller's default color". */
     public record Text(String text, int color, int size, boolean bold, boolean italic, boolean underline)
             implements Inline {
         public Text {
@@ -323,18 +323,37 @@ public final class RichText {
         return true;
     }
 
+    /** True when the character at {@code at} is escaped: an odd run of backslashes sits right before it. */
+    private static boolean escaped(String s, int at) {
+        int n = 0;
+        for (int i = at - 1; i >= 0 && s.charAt(i) == '\\'; i--) {
+            n++;
+        }
+        return n % 2 == 1;
+    }
+
+    /** Next unescaped {@code token}, so {@code *\**} closes on the last star rather than the escaped one. */
     private static int indexOf(String s, String token, int from, int end) {
         int at = s.indexOf(token, from);
+        while (at >= 0 && escaped(s, at)) {
+            at = s.indexOf(token, at + 1);
+        }
         return at >= 0 && at + token.length() <= end ? at : -1;
     }
 
-    /** Next lone {@code *} that follows a non-space, so {@code 5 * 3 * 2} is not italic. */
+    /** Next lone, unescaped {@code *} that follows a non-space, so {@code 5 * 3 * 2} is not italic. */
     private static int singleStar(String s, int from, int end) {
         for (int i = from; i < end; i++) {
-            if (s.charAt(i) == '*' && !s.startsWith("**", i) && s.charAt(i - 1) != '*'
-                    && !Character.isWhitespace(s.charAt(i - 1))) {
-                return i;
+            if (s.charAt(i) != '*' || escaped(s, i) || Character.isWhitespace(s.charAt(i - 1))) {
+                continue;
             }
+            if (s.startsWith("**", i)) {
+                continue;
+            }
+            if (s.charAt(i - 1) == '*' && !escaped(s, i - 1)) {
+                continue;
+            }
+            return i;
         }
         return -1;
     }

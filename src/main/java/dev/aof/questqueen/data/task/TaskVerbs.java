@@ -19,8 +19,8 @@ import java.util.Optional;
  * {@code assets/questqueen/lang/en_us.json} had no task-verb keys at all.
  *
  * <p>Now every type resolves through {@code questqueen.task.<type>} with the previous English string as the
- * translatable's own fallback, so a pack or a translator can correct or localise a verb without a mod
- * release, and an unmapped future type degrades to a humanised name rather than an identifier.
+ * translatable's own fallback, so a pack or a translator can correct or localize a verb without a mod
+ * release, and an unmapped future type degrades to a humanized name rather than an identifier.
  */
 public final class TaskVerbs {
     /** Prefix for every verb key, e.g. {@code questqueen.task.item_tag}. */
@@ -80,6 +80,10 @@ public final class TaskVerbs {
         if (task == null) {
             return "";
         }
+        Optional<String> own = task.verb().filter(v -> !v.isBlank());
+        if (own.isPresent()) {
+            return own.get();
+        }
         String statFragment = statFragment(task).orElse(null);
         if (statFragment != null) {
             return translated(KEY_PREFIX + "stat." + statFragment, STAT_VERBS.get(statFragment));
@@ -87,7 +91,7 @@ public final class TaskVerbs {
         return verb(task.type());
     }
 
-    /** The verb shown for a raw type id, with aliases resolved and unknown types humanised. */
+    /** The verb shown for a raw type id, with aliases resolved and unknown types humanized. */
     public static String verb(String type) {
         String canonical = canonical(type);
         return translated(KEY_PREFIX + canonical, VERBS.getOrDefault(canonical, humanize(canonical)));

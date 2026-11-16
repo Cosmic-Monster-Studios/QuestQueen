@@ -1,14 +1,18 @@
 // A quest description edited in place: the rendered text on the card turns into its markup, a toolbar for
-// the book's markup (bold, italic, underline, headings, bullet, rule, colour, glyph, item, picture) and a live render
+// the book's markup (bold, italic, underline, headings, bullet, rule, color, glyph, item, picture) and a live render
 // under it. Done keeps it, Cancel or Esc puts it back. Toolbar inserts go after the selection, never over it.
 import { GLYPH_IDS } from "../glyphs";
 import { descriptionProblems, richToHtml, validTexture, type PreviewOptions } from "../richtext";
+import type { PackCatalog } from "../packCatalog";
+import { attachCombo, itemIcon, textureIcon } from "./combo";
 import { h } from "./dom";
 
 export interface DescribeOptions {
   value: string;
   onCommit: (value: string) => void;
   preview: PreviewOptions;
+  /** The pack's lists, for the item and picture boxes. */
+  catalog?: () => PackCatalog;
 }
 
 /** Open editors, each able to commit itself: a redraw that is about to replace one flushes it first. */
@@ -71,7 +75,7 @@ export function openDescribe(host: HTMLElement, opts: DescribeOptions): void {
     area.focus();
     fire();
   };
-  const color = h("input", { type: "color", value: "#ffaa00", "aria-label": "Text colour" }) as HTMLInputElement;
+  const color = h("input", { type: "color", value: "#ffaa00", "aria-label": "Text color" }) as HTMLInputElement;
   const glyph = h("select", { "aria-label": "Insert a glyph" }, h("option", { value: "" }, "Glyph…"),
     ...GLYPH_IDS.map((id) => h("option", { value: id }, id))) as HTMLSelectElement;
   glyph.addEventListener("change", () => {
@@ -80,6 +84,11 @@ export function openDescribe(host: HTMLElement, opts: DescribeOptions): void {
   });
   const item = h("input", { class: "desc-item-id", placeholder: "minecraft:diamond", "aria-label": "Item id to show in the text" }) as HTMLInputElement;
   const picPath = h("input", { class: "desc-pic-path", placeholder: "mypack:textures/quest/castle.png", "aria-label": "Picture: resource pack texture" }) as HTMLInputElement;
+  if (opts.catalog) {
+    const catalog = opts.catalog;
+    attachCombo(item, () => catalog().items, { icon: itemIcon });
+    attachCombo(picPath, () => catalog().textures ?? [], { icon: textureIcon });
+  }
   const picCaption = h("input", { class: "desc-pic-caption", placeholder: "caption (optional)", "aria-label": "Picture caption" }) as HTMLInputElement;
   const tool = (label: string, title: string, run: () => void) =>
     h("button", { type: "button", class: "desc-tool", title, "aria-label": title, onclick: (event: Event) => { event.preventDefault(); note.textContent = ""; run(); } }, label);
@@ -92,7 +101,7 @@ export function openDescribe(host: HTMLElement, opts: DescribeOptions): void {
     tool("•", "Bullet: - text", () => prefixLines("- ")),
     tool("—", "Divider line: ---", () => insert("---", true)),
     color,
-    tool("Colour", "Colour the selected text", () => surround(`{#${color.value.slice(1).toUpperCase()}}`, "{/#}", "coloured text")),
+    tool("Color", "Color the selected text", () => surround(`{#${color.value.slice(1).toUpperCase()}}`, "{/#}", "colored text")),
     glyph,
     h("span", { class: "desc-tool-group" }, item, tool("Item", "Show an item's icon in the text", () => {
       const id = item.value.trim();

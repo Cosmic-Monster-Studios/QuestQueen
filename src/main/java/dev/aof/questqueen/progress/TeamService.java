@@ -63,6 +63,21 @@ public final class TeamService {
     }
 
     /**
+     * Everyone who shares {@code player}'s progress, online or not, with {@code player} always first. Just the
+     * player when they have no team.
+     */
+    public static List<UUID> membersOf(ServerPlayer player) {
+        List<UUID> out = new ArrayList<>();
+        out.add(player.getUUID());
+        for (UUID member : members(current(player))) {
+            if (!out.contains(member)) {
+                out.add(member);
+            }
+        }
+        return List.copyOf(out);
+    }
+
+    /**
      * Moves a player's progress from where Quest Queen used to keep it to where they play now, once. Sources, in
      * order: the legacy {@code team_members} team, then {@code solo:<uuid>}. The first source with progress moves,
      * and only into a target that has none, so nothing is merged or overwritten. A legacy team shared by several

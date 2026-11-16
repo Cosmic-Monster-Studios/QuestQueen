@@ -1,6 +1,8 @@
 package dev.aof.questqueen.progress;
 
 import dev.aof.questqueen.QuestQueen;
+import dev.aof.questqueen.api.event.QuestCompletedEvent;
+import dev.aof.questqueen.api.event.RewardsClaimedEvent;
 import dev.aof.questqueen.data.Chapter;
 import dev.aof.questqueen.data.ChapterTree;
 import dev.aof.questqueen.data.GateCondition;
@@ -9,6 +11,7 @@ import dev.aof.questqueen.data.HiddenUntil;
 import dev.aof.questqueen.data.QuestDefinitions;
 import dev.aof.questqueen.data.StartNodes;
 import dev.aof.questqueen.data.Tile;
+import dev.aof.questqueen.data.TileNames;
 import dev.aof.questqueen.data.reward.ChoiceReward;
 import dev.aof.questqueen.data.reward.Reward;
 import dev.aof.questqueen.data.reward.StageReward;
@@ -23,7 +26,9 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.scores.Objective;
 import net.minecraft.world.scores.ScoreHolder;
+import net.neoforged.bus.api.Event;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
@@ -370,9 +375,11 @@ public final class ProgressService {
         writeProgress(teamId, questId, "claimed", 1, true);
         grantTileRewards(player, chapterId, tile.get());
         player.playNotifySound(SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 0.4F, 1.2F);
-        player.sendSystemMessage(Component.translatable("questqueen.rewards_claimed", tile.get().title()));
+        player.sendSystemMessage(Component.translatable("questqueen.rewards_claimed", TileNames.title(tile.get())));
         noteMutation(player, teamId);
         syncTeam(player.server, teamId);
+        postClaimed(player, teamId, chapterId, tile.get(), claimedRewards(tile.get(), null),
+                RewardsClaimedEvent.Source.TILE);
         return true;
     }
 
@@ -392,7 +399,7 @@ public final class ProgressService {
             return 0;
         }
         String teamId = TeamService.current(player);
-        int granted = 0;
+        List<Tile> claimed = new ArrayList<>();
         SUSPEND_SYNC.set(true);
         try {
             for (Tile tile : tiles) {
@@ -403,11 +410,12 @@ public final class ProgressService {
                 }
                 writeProgress(teamId, questId, "claimed", 1, true);
                 grantTileRewards(player, chapterId, tile);
-                granted++;
+                claimed.add(tile);
             }
         } finally {
             SUSPEND_SYNC.set(false);
         }
+        int granted = claimed.size();
         if (granted == 0) {
             return 0;
         }
@@ -416,6 +424,9 @@ public final class ProgressService {
         player.playNotifySound(SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 0.4F, 1.2F);
         String title = open.title().isBlank() ? open.id().toString() : open.title();
         player.sendSystemMessage(Component.translatable("questqueen.rewards_claimed_chapter", granted, title));
+        for (Tile tile : claimed) {
+            postClaimed(player, teamId, chapterId, tile, claimedRewards(tile, null), RewardsClaimedEvent.Source.CHAPTER);
+        }
         return granted;
     }
 
@@ -440,14 +451,14 @@ public final class ProgressService {
      */
     public static int grantAll(ServerPlayer player) {
         String teamId = TeamService.current(player);
-        int granted = 0;
+        List<String[]> completed = new ArrayList<>();
         var connection = ProgressDatabase.get();
         try {
             connection.setAutoCommit(false);
             for (Chapter chapter : QuestDefinitions.chapters()) {
                 for (Tile tile : chapter.tiles()) {
                     if (forceCompleteTile(teamId, chapter, tile)) {
-                        granted++;
+                        completed.add(new String[]{chapter.id().toString(), tile.id()});
                     }
                 }
             }
@@ -484,7 +495,13 @@ public final class ProgressService {
         lastBulkStagesSkipped = stagesSkipped;
         noteMutation(player, teamId);
         syncTeam(player.server, teamId);
-        return granted;
+        // After the commit: a listener that reads progress sees every tile this sweep completed.
+        List<UUID> members = TeamService.membersOf(player);
+        for (String[] done : completed) {
+            post(new QuestCompletedEvent(player, teamId, members, ResourceLocation.parse(done[0]), done[1],
+                    QuestCompletedEvent.Source.GRANT_ALL));
+        }
+        return completed.size();
     }
 
     /** Tiles whose stage rewards were skipped by the most recent {@link #grantAll}. */
@@ -702,6 +719,8 @@ public final class ProgressService {
                 noteMutation(player, teamId);
                 syncTeam(player.server, teamId);
                 player.playNotifySound(SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 0.4F, 1.2F);
+                postClaimed(player, teamId, chapterId, tile.get(), claimedRewards(tile.get(), choice.options().get(option)),
+                        RewardsClaimedEvent.Source.CHOICE);
                 return;
             }
         }
@@ -807,8 +826,42 @@ public final class ProgressService {
         // Only point the player at the book when there is something there to claim.
         boolean loot = !tile.rewards().isEmpty() || !tile.scrolls().isEmpty();
         player.sendSystemMessage(Component.translatable(loot ? "questqueen.complete" : "questqueen.complete.plain",
-                tile.title()));
+                TileNames.title(tile)));
         // Caller (increment/setCompleted) already schedules syncTeam — one flush covers the tile flag.
+        post(new QuestCompletedEvent(player, teamId, TeamService.membersOf(player), chapter.id(), tile.id(),
+                QuestCompletedEvent.Source.PROGRESS));
+    }
+
+    /** What a claim hands out: the tile's rewards, with its pick-one reward replaced by {@code picked}. */
+    private static List<Reward> claimedRewards(Tile tile, Reward picked) {
+        List<Reward> out = new ArrayList<>();
+        for (Reward reward : tile.rewards()) {
+            if (!(reward instanceof ChoiceReward)) {
+                out.add(reward);
+            }
+        }
+        if (picked != null) {
+            out.add(picked);
+        }
+        return out;
+    }
+
+    private static void postClaimed(ServerPlayer player, String teamId, ResourceLocation chapterId, Tile tile,
+                                    List<Reward> rewards, RewardsClaimedEvent.Source source) {
+        post(new RewardsClaimedEvent(player, teamId, TeamService.membersOf(player), chapterId, tile.id(), rewards,
+                source));
+    }
+
+    /**
+     * Post an addon event. The progress it reports is already stored, so a listener that throws is logged and the
+     * claim or completion stands.
+     */
+    private static void post(Event event) {
+        try {
+            NeoForge.EVENT_BUS.post(event);
+        } catch (RuntimeException exception) {
+            QuestQueen.LOGGER.error("A Quest Queen {} listener failed", event.getClass().getSimpleName(), exception);
+        }
     }
 
     /** True when this tile offers a pick-one reward, i.e. completion does not settle it. */

@@ -1,5 +1,6 @@
 package dev.aof.questqueen.client;
 
+import dev.aof.questqueen.data.TileNames;
 import dev.aof.questqueen.data.Chapter;
 import dev.aof.questqueen.data.ChapterTree;
 import dev.aof.questqueen.data.GateCondition;
@@ -473,7 +474,7 @@ public final class ClientQuestState {
 
     public static String taskVerb(Tile tile) {
         if (tile.tasks().isEmpty()) {
-            return tile.title().isBlank() ? tile.id() : tile.title();
+            return TileNames.text(tile);
         }
         return taskVerb(tile.tasks().getFirst(), tile);
     }
@@ -488,7 +489,7 @@ public final class ClientQuestState {
      */
     public static String taskVerb(Task task, Tile tile) {
         if (task == null) {
-            return tile.title().isBlank() ? tile.id() : tile.title();
+            return TileNames.text(tile);
         }
         return TaskVerbs.verb(task);
     }
@@ -508,6 +509,10 @@ public final class ClientQuestState {
         int need = Math.max(1, task.required());
         int value = progress.value(chapter.id() + "/" + tile.id(), Integer.toString(taskIndex));
         String verb = taskVerb(task, tile);
+        Optional<String> own = task.progressText(value);
+        if (own.isPresent()) {
+            return own.get().isBlank() ? verb : verb + " " + own.get();
+        }
         if (need <= 1) {
             return verb;
         }
@@ -527,7 +532,12 @@ public final class ClientQuestState {
                 || progress.taskCompleted(questId, Integer.toString(taskIndex))) {
             return "DONE";
         }
-        int need = Math.max(1, tile.tasks().get(taskIndex).required());
+        Task task = tile.tasks().get(taskIndex);
+        int need = Math.max(1, task.required());
+        Optional<String> own = task.progressText(liveValue(chapter, tile, taskIndex));
+        if (own.isPresent()) {
+            return own.get();
+        }
         if (need <= 1) {
             return "";
         }

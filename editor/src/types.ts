@@ -56,6 +56,8 @@ export interface Tile {
   target?: JumpTarget;
   hidden_until?: HiddenUntil;
   required_stage?: string;
+  /** Parents not drawn as links (too far away, or in another chapter); kept as written. */
+  requires?: { op?: string; conditions?: LinkCondition[] };
 }
 export type LinkCondition = { type: string; id: string };
 export interface Link { from: string; to: string; gate?: string | { op: string; conditions?: LinkCondition[] }; }

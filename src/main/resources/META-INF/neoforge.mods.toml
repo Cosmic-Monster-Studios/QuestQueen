@@ -16,7 +16,7 @@ A pixel-grid quest book with datapack chapters, team progress, and a browser que
 [[dependencies.${mod_id}]]
     modId="neoforge"
     type="required"
-    versionRange="[${neo_version},)"
+    versionRange="[${neo_min_version},)"
     ordering="NONE"
     side="BOTH"
 

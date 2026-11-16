@@ -26,6 +26,8 @@ public final class QuestConfig {
     /** Hex ARGB frame of a claimable tile; empty = the theme's own. */
     public static final ModConfigSpec.ConfigValue<String> CLAIM_EDGE;
     /** Where the pinned quest sits on the HUD: top_left (default), top_center, top_right, middle_left, middle_right, bottom_left, bottom_right. */
+    /** auto | game | 1-4: the GUI scale the book opens at. */
+    public static final ModConfigSpec.ConfigValue<String> BOOK_SCALE;
     /** The keyboard icon in the book's top bar that lists the keys on hover. */
     public static final ModConfigSpec.BooleanValue SHOW_KEY_HELP_ICON;
     /** Quest book button in the survival inventory. */
@@ -43,7 +45,7 @@ public final class QuestConfig {
                 .define("githubIssuesUrl", "");
         builder.push("effects");
         ANIMATIONS = builder
-                .comment("Book motion: travelling path arrows, completion flares, gate pips, modal shimmer,",
+                .comment("Book motion: traveling path arrows, completion flares, gate pips, modal shimmer,",
                         "breathing CLAIM, sidebar slide, inspect settle, log drawer, claim sparks,",
                         "choice arrival, selection halo, task fill. Turn off for a completely static book.")
                 .define("animations", true);
@@ -71,6 +73,14 @@ public final class QuestConfig {
         SIDEBAR_TITLE_SHADOW = builder
                 .comment("Override title shadow: -1 pack, 0 off, 1 on.")
                 .defineInRange("sidebarTitleShadow", -1, -1, 1);
+        builder.pop();
+        builder.push("book");
+        BOOK_SCALE = builder
+                .comment("GUI scale the quest book opens at. auto picks one from the window size (the default).",
+                        "game uses your Video Settings GUI Scale. 1, 2, 3 or 4 sets it yourself.",
+                        "game and a number are lowered if the book would not fit the window at that scale.",
+                        "Your own GUI scale is put back when the book closes.")
+                .define("scale", "auto");
         builder.pop();
         builder.push("keyboard");
         SHOW_KEY_HELP_ICON = builder

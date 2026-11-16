@@ -146,6 +146,24 @@
             "type": { "type": "string", "enum": ["trigger", "quest_complete", "advancement", "team_flag", "scoreboard"] },
             "id": { "type": "string" }
           }
+        },
+        "requires": {
+          "type": "object",
+          "description": "Parents the board does not draw as links: quests too far away to sit next to this one, or in another chapter. They count under the same op as the quest's links (with no links, under this op). quest_complete ids are chapter/quest, e.g. mypack:mining/first_pick.",
+          "properties": {
+            "op": { "type": "string", "enum": ["and", "or", "not", "xor"] },
+            "conditions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["type", "id"],
+                "properties": {
+                  "type": { "type": "string", "enum": ["advancement", "scoreboard", "team_flag", "quest_complete", "chapter_complete", "trigger", "stage"] },
+                  "id": { "type": "string" }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -185,7 +203,10 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["obtain", "item", "item_tag", "submit", "kill", "kill_entity", "raid", "advancement", "location", "visit_structure", "structure", "visit_dimension", "dimension", "visit_biome", "biome", "observation", "checkmark", "stat", "interact_block", "interact_entity", "fluid", "xp_levels", "npc_dialog", "trigger"]
+          "anyOf": [
+            { "enum": ["obtain", "item", "item_tag", "submit", "kill", "kill_entity", "raid", "advancement", "location", "visit_structure", "structure", "visit_dimension", "dimension", "visit_biome", "biome", "observation", "checkmark", "stat", "interact_block", "interact_entity", "fluid", "xp_levels", "npc_dialog", "trigger"] },
+            { "pattern": "^[a-z0-9_.-]+:[a-z0-9_./-]+$", "description": "A task type an addon registers, namespaced with its mod id" }
+          ]
         },
         "item": { "type": "string" },
         "tag": { "type": "string" },
@@ -212,13 +233,20 @@
       "type": "object",
       "required": ["type"],
       "properties": {
-        "type": { "type": "string", "enum": ["item", "xp", "xp_levels", "command", "loot", "toast", "advancement", "choice"] },
+        "type": {
+          "type": "string",
+          "anyOf": [
+            { "enum": ["item", "xp", "xp_levels", "command", "loot", "toast", "advancement", "choice"] },
+            { "pattern": "^[a-z0-9_.-]+:[a-z0-9_./-]+$", "description": "A reward type an addon registers, namespaced with its mod id" }
+          ]
+        },
         "item": { "type": "string" },
         "count": { "type": "integer" },
         "amount": { "type": "integer" },
         "levels": { "type": "integer" },
         "command": { "type": "string" },
         "table": { "type": "string" },
+        "name": { "type": "string", "description": "loot: what the book calls the roll, e.g. \"Mekanism T1\"; without it, the table's path" },
         "message": { "type": "string" },
         "advancement": { "type": "string" },
         "options": {

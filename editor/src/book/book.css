@@ -1,4 +1,4 @@
-/* The Living Book. Colours are the chapter theme's (applyPalette writes --void, --cell, --current, …), sizes are
+/* The Living Book. Colors are the chapter theme's (applyPalette writes --void, --cell, --current, …), sizes are
    book pixels times --px (CSS px per book px), so the board lines up with the game at the same GUI scale. */
 
 .qq-book-app {
@@ -14,7 +14,7 @@
   font: 14px/1.4 system-ui, sans-serif; overflow: hidden;
 }
 
-/* Text in the book's own font: 8 book px per line, with Minecraft's 1 px drop shadow at 25% of the text colour. */
+/* Text in the book's own font: 8 book px per line, with Minecraft's 1 px drop shadow at 25% of the text color. */
 .qq-text {
   font-family: QQBook, system-ui, sans-serif;
   font-size: calc(var(--px) * 8px);
@@ -229,6 +229,9 @@ button.task-row, button.reward-row { cursor: pointer; }
 .control-line .kind-select option, .control-line .kind-select optgroup { background: #16121c; color: #efe8f6; }
 .control-line .box { width: calc(var(--px, 2) * 60px); }
 .control-line .box.num { width: calc(var(--px, 2) * 22px); }
+/* An addon's task or reward: its fields as JSON. Red edge while the text is not a JSON object. */
+.control-line .addon-json { width: calc(var(--px, 2) * 110px); min-height: calc(var(--px, 2) * 18px); font-family: ui-monospace, monospace; resize: vertical; }
+.control-line .addon-json.bad { border-color: #e01018; }
 .control-line .field { display: inline-flex; align-items: center; gap: calc(var(--px, 2) * 2px); }
 .control-line .field-label { font: calc(var(--px, 2) * 4.5px) / 1 QQBook, system-ui, sans-serif; color: var(--text, #f5f0e0); text-transform: uppercase; }
 .control-line .field-icon { width: calc(var(--px, 2) * 8px); height: calc(var(--px, 2) * 8px); image-rendering: pixelated; }
@@ -707,7 +710,8 @@ button.task-row, button.reward-row { cursor: pointer; }
 @media (prefers-reduced-motion: no-preference) { .guide-target { animation: guide-pulse 1.6s ease-in-out infinite; } }
 @keyframes guide-pulse { 50% { outline-color: rgba(255, 184, 74, 0.4); } }
 /* Id dropdown (items, mobs, structures, stages…) */
-.combo-panel { color-scheme: dark; position: fixed; z-index: 60; display: flex; flex-direction: column; background: #16101d; border: 2px solid var(--edit); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.65); font: 13px system-ui, sans-serif; color: var(--ui); }
+/* On the page body above the pickers (90, 95) and dialogs (100). */
+.combo-panel { color-scheme: dark; position: fixed; z-index: 200; display: flex; flex-direction: column; background: #16101d; border: 2px solid var(--edit); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.65); font: 13px system-ui, sans-serif; color: var(--ui); }
 .combo-list { overflow: auto; min-height: 0; flex: 1; }
 .combo-row { display: flex; align-items: center; gap: 8px; padding: 4px 8px; cursor: pointer; white-space: nowrap; }
 .combo-row:hover, .combo-row.active { background: #2a1f38; }

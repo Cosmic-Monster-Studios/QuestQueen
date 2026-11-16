@@ -8,18 +8,25 @@ import { commandPreviewHtml } from "../commandReward";
 import { iconUrl } from "../itemSelect";
 import type { CatalogEntry } from "../packCatalog";
 import type { Reward, Task } from "../types";
-import { attachCombo } from "./combo";
+import { GLYPH_IDS } from "../glyphs";
+import { attachCombo, itemIcon, textureIcon } from "./combo";
+import { npcEntries, stageEntries, triggerEntries } from "./lists";
 import { h } from "./dom";
 import { namer } from "./names";
-import { REWARD_KINDS, TASK_KINDS, emptyReward, emptyTask, rewardKindOf, kindOf, rewardSentence, taskSentence, type FieldSpec, type Kind, type Picker } from "./sentences";
+import { REWARD_KINDS, TASK_KINDS, emptyReward, emptyTask, isAddonType, rewardKindOf, kindOf, rewardSentence, taskSentence, type FieldSpec, type Kind, type Picker } from "./sentences";
 import type { BookState } from "./store";
 
 const LISTS: Partial<Record<Picker, (s: BookState) => CatalogEntry[]>> = {
   item: (s) => s.catalog.items, entity: (s) => s.catalog.entities, block: (s) => s.catalog.blocks, tag: (s) => s.catalog.tags,
-  entityTag: () => [], biome: (s) => s.catalog.biomes, structure: (s) => s.catalog.structures, dimension: (s) => s.catalog.dimensions ?? [],
+  entityTag: (s) => s.catalog.entityTags ?? [], biome: (s) => s.catalog.biomes, structure: (s) => s.catalog.structures, dimension: (s) => s.catalog.dimensions ?? [],
   fluid: (s) => s.catalog.fluids ?? [], advancement: (s) => s.catalog.advancements, loot: (s) => s.catalog.loot,
-  stage: (s) => s.stages.stages.map((st) => ({ id: st.id, name: st.name })),
+  // A command reward's icon: an item, a glyph or a texture.
+  icon: (s) => [...s.catalog.items, ...GLYPH_IDS.map((g) => ({ id: `glyph:${g}`, name: `Glyph: ${g}` })), ...(s.catalog.textures ?? [])],
+  stage: stageEntries, stat: (s) => s.catalog.stats ?? [], npc: npcEntries, trigger: triggerEntries,
 };
+/** Boxes for words the author makes up (a name, a trigger): their list is a reminder, not a check. */
+const FREE: Partial<Record<Picker, true>> = { npc: true, trigger: true, icon: true };
+const rowIcon = (id: string) => (id.startsWith("glyph:") ? undefined : id.includes(":textures/") ? textureIcon(id) : itemIcon(id));
 
 /** The pack's entries for a picker kind (what its dropdown lists). */
 export function catalogEntries(picker: Picker, state: BookState): CatalogEntry[] {
@@ -34,10 +41,10 @@ function field(spec: FieldSpec, value: Value, state: BookState, set: (key: strin
   const input = h("input", {
     class: `box${number ? " num" : ""}`, type: number ? "number" : "text", dataset: { field: spec.key },
     value: raw === undefined ? "" : String(raw),
-    "aria-label": spec.label, placeholder: number ? "" : spec.picker === "text" ? spec.label : "namespace:id",
+    "aria-label": spec.label, placeholder: number ? "" : spec.picker === "text" || FREE[spec.picker] ? spec.label : "namespace:id",
     min: number && spec.key !== "x" && spec.key !== "y" && spec.key !== "z" ? "1" : undefined, spellcheck: "false",
   }) as HTMLInputElement;
-  if (LISTS[spec.picker]) attachCombo(input, () => catalogEntries(spec.picker, state), { icons: spec.picker === "item" });
+  if (LISTS[spec.picker]) attachCombo(input, () => catalogEntries(spec.picker, state), { icon: spec.picker === "item" ? itemIcon : spec.picker === "icon" ? rowIcon : undefined });
   const icon = spec.picker === "item" ? h("img", { class: "field-icon icon", alt: "", hidden: !raw }) as HTMLImageElement : null;
   const showIcon = () => {
     if (!icon) return;
@@ -62,9 +69,37 @@ function kindSelect(kinds: Kind[], current: string, grouped: boolean): HTMLSelec
   const children = grouped
     ? (["Gather", "Fight", "Explore", "Do"] as const).map((g) => h("optgroup", { label: g }, ...options(kinds.filter((k) => k.group === g))))
     : options(kinds);
+  // An addon's type keeps its own entry, so the dropdown never quietly shows (and saves) another type.
+  if (isAddonType(current) && !kinds.some((k) => k.type === current)) {
+    children.unshift(h("option", { value: current, selected: true }, `Addon: ${current}`));
+  }
   const select = h("select", { class: "kind-select", "aria-label": "Type" }, ...children) as HTMLSelectElement;
   select.value = current;
   return select;
+}
+
+/**
+ * An addon's task or reward, a namespaced type the book has no form for: its fields as JSON, kept as written. Text
+ * that is not a JSON object is marked and not saved until it is.
+ */
+function addonFields(value: Value, onChange: (value: Value) => void): HTMLElement[] {
+  const { type, ...rest } = value;
+  const area = h("textarea", {
+    class: "box addon-json", rows: 3, spellcheck: "false", "aria-label": `${String(type)} fields as JSON`,
+    title: "Added by another mod. Its fields, as JSON.",
+  }) as HTMLTextAreaElement;
+  area.value = JSON.stringify(rest, null, 1);
+  area.addEventListener("input", () => {
+    try {
+      const parsed: unknown = JSON.parse(area.value.trim() || "{}");
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not an object");
+      area.classList.remove("bad");
+      onChange({ ...(parsed as Value), type });
+    } catch {
+      area.classList.add("bad");
+    }
+  });
+  return [h("label", { class: "field" }, h("span", { class: "field-label" }, "Fields (JSON)"), area)];
 }
 
 /** Drop empty optional halves of "a or b" fields, so a mob task with an empty tag field saves without "tag". */
@@ -91,6 +126,13 @@ export function taskLine(task: Task, state: BookState, onChange: (task: Task) =>
       onChange(value as unknown as Task);
       draw();
     });
+    if (!kind && isAddonType(String(value.type))) {
+      line.replaceChildren(select, ...addonFields(value, (next) => {
+        value = next;
+        onChange(value as unknown as Task);
+      }));
+      return;
+    }
     line.replaceChildren(select, ...fieldsOf(kind, value, state, (key, v) => {
       value = tidy(kind, { ...value, [key]: v });
       onChange(value as unknown as Task);
@@ -125,7 +167,7 @@ export function rewardLine(reward: Reward, state: BookState, onChange: (reward: 
       parts.push(list, h("button", { type: "button", class: "picker-btn small", onclick: () => { options.push(emptyReward("item")); value.options = options; emit(); draw(); } }, "+ Option"));
     } else if (value.type === "command") {
       const commandFields: FieldSpec[] = [
-        { key: "command", label: "Command", picker: "text" }, { key: "icon", label: "Icon (item, glyph:id or a texture)", picker: "text" },
+        { key: "command", label: "Command", picker: "text" }, { key: "icon", label: "Icon (item, glyph:id or a texture)", picker: "icon" },
         { key: "name", label: "Name players see", picker: "text" }, { key: "description", label: "Description on hover", picker: "text" },
       ];
       const previewEl = h("div", { class: "command-preview" });
@@ -137,6 +179,11 @@ export function rewardLine(reward: Reward, state: BookState, onChange: (reward: 
         emit();
       })), h("div", { class: "field-label" }, "Players see"), previewEl);
       refresh();
+    } else if (!rewardKindOf(value.type) && isAddonType(value.type)) {
+      parts.push(...addonFields(value as unknown as Value, (next) => {
+        value = next as unknown as Reward;
+        emit();
+      }));
     } else {
       const kind = rewardKindOf(value.type);
       parts.push(...fieldsOf(kind, value as unknown as Value, state, (key, v) => {
